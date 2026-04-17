@@ -1,0 +1,128 @@
+<view class="container">
+  <view wx:if="{{!allowed}}" class="card">
+    <view class="section-title">无权限</view>
+    <view class="muted">该页面仅食堂人员、管理员、超级管理员可访问。</view>
+  </view>
+
+  <block wx:else>
+    <view class="card">
+      <view class="space-between">
+        <view>
+          <view class="section-title">管理中心</view>
+          <view class="muted">当前角色：{{roleLabel}}</view>
+        </view>
+        <view class="inline">
+          <button wx:if="{{isAdmin}}" class="subtle-btn" size="mini" bindtap="goAdminUsers">用户管理</button>
+          <button class="subtle-btn" size="mini" bindtap="goMealManage">菜品管理</button>
+          <button class="subtle-btn" size="mini" bindtap="logout">退出登录</button>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{isAdmin && dashboard}}" class="card">
+      <view class="section-title">今日看板</view>
+      <view class="grid">
+        <view class="grid-item">
+          <view class="metric-value">{{dashboard.total_orders}}</view>
+          <view class="muted">总订单</view>
+        </view>
+        <view class="grid-item">
+          <view class="metric-value">{{dashboard.breakfast_orders}}</view>
+          <view class="muted">早餐订单</view>
+        </view>
+        <view class="grid-item">
+          <view class="metric-value">{{dashboard.lunch_orders}}</view>
+          <view class="muted">中餐订单</view>
+        </view>
+        <view class="grid-item">
+          <view class="metric-value">{{dashboard.dinner_orders}}</view>
+          <view class="muted">晚餐订单</view>
+        </view>
+      </view>
+
+      <view class="sub-title">今日中/晚餐套餐份数</view>
+      <view wx:if="{{!dashboardPackageStats.length}}" class="empty-text">暂无中晚餐套餐数据</view>
+      <view wx:for="{{dashboardPackageStats}}" wx:key="key" wx:for-item="item" class="pkg-row">
+        <view class="pkg-name">{{item.mealTypeLabel}} / {{item.packageName}}</view>
+        <view class="pkg-qty">{{item.totalQuantity}} 份</view>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">区间统计</view>
+      <view class="space-between picker-row">
+        <text class="muted">开始日期</text>
+        <picker mode="date" value="{{fromDate}}" data-field="fromDate" bindchange="onDateChange">
+          <view class="picker-value">{{fromDate}}</view>
+        </picker>
+      </view>
+      <view class="space-between picker-row">
+        <text class="muted">结束日期</text>
+        <picker mode="date" value="{{toDate}}" data-field="toDate" bindchange="onDateChange">
+          <view class="picker-value">{{toDate}}</view>
+        </picker>
+      </view>
+      <view class="inline quick-row">
+        <button class="primary-btn half-btn" loading="{{loading}}" bindtap="queryToday">查询今天</button>
+        <button class="subtle-btn half-btn" bindtap="queryTomorrow">查询明天</button>
+      </view>
+
+      <view wx:if="{{summary}}" class="grid summary-grid">
+        <view class="grid-item">
+          <view class="metric-value">{{summary.total_orders}}</view>
+          <view class="muted">总订单</view>
+        </view>
+        <view class="grid-item">
+          <view class="metric-value">{{summary.breakfast_orders}}</view>
+          <view class="muted">早餐</view>
+        </view>
+        <view class="grid-item">
+          <view class="metric-value">{{summary.lunch_orders}}</view>
+          <view class="muted">中餐</view>
+        </view>
+        <view class="grid-item">
+          <view class="metric-value">{{summary.dinner_orders}}</view>
+          <view class="muted">晚餐</view>
+        </view>
+      </view>
+
+      <view wx:if="{{summary}}" class="sub-title">区间中/晚餐套餐份数</view>
+      <view wx:if="{{summary && !summaryPackageStats.length}}" class="empty-text">暂无中晚餐套餐数据</view>
+      <view wx:for="{{summaryPackageStats}}" wx:key="key" wx:for-item="item" class="pkg-row">
+        <view class="pkg-name">{{item.mealTypeLabel}} / {{item.packageName}}</view>
+        <view class="pkg-qty">{{item.totalQuantity}} 份</view>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">早餐单品统计（份数+价格）</view>
+      <view wx:if="{{!breakfastItems.length}}" class="empty-text">当前区间暂无早餐单品数据</view>
+      <view wx:for="{{breakfastItems}}" wx:key="itemName" wx:for-item="item" class="stat-row">
+        <view class="stat-name">{{item.itemName}}</view>
+        <view class="stat-val">份数：{{item.totalQuantity}}</view>
+        <view class="stat-val">单价：¥{{item.unitPrice}}</view>
+        <view class="stat-val">金额：¥{{item.totalAmount}}</view>
+      </view>
+      <view wx:if="{{breakfastItems.length}}" class="stat-total">合计金额：¥{{breakfastTotalAmount}}</view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">统计导出</view>
+      <picker mode="selector" range="{{mealTypeLabels}}" value="{{mealTypeIndex}}" bindchange="onMealTypeChange">
+        <view class="picker-value">时段：{{mealTypeLabels[mealTypeIndex]}}</view>
+      </picker>
+      <picker mode="selector" range="{{mealCategoryLabels}}" value="{{mealCategoryIndex}}" bindchange="onCategoryChange">
+        <view class="picker-value">套餐：{{mealCategoryLabels[mealCategoryIndex]}}</view>
+      </picker>
+      <view class="inline">
+        <button class="primary-btn half-btn" loading="{{exporting}}" bindtap="createExportJob">执行导出</button>
+        <button class="subtle-btn half-btn" bindtap="refreshExportJob">刷新任务</button>
+      </view>
+      <view wx:if="{{exportJob}}" class="job-card">
+        <view class="muted">任务号：{{exportJob.job_no}}</view>
+        <view class="muted">状态：{{exportJob.status}}</view>
+        <view class="muted">文件：{{exportJob.file_path || '-'}}</view>
+      </view>
+    </view>
+  </block>
+</view>

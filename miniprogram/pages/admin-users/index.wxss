@@ -1,0 +1,45 @@
+.half-btn {
+  flex: 1;
+  margin-right: 10rpx;
+}
+
+.half-btn:last-child {
+  margin-right: 0;
+}
+
+.create-toggle {
+  margin-top: 14rpx;
+}
+
+.picker-value {
+  background: linear-gradient(135deg, #eef4fd 0%, #e0ebf9 100%);
+  border-radius: 12rpx;
+  padding: 16rpx 18rpx;
+  color: #0b2a4a;
+  margin-bottom: 16rpx;
+}
+
+.user-card {
+  padding-top: 18rpx;
+  border-left: 8rpx solid #0b2a4a;
+}
+
+.user-name {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0b2a4a;
+  margin-bottom: 6rpx;
+}
+
+.action-row {
+  margin-top: 14rpx;
+  justify-content: space-between;
+}
+
+.picker-role {
+  min-width: 250rpx;
+  padding: 10rpx 14rpx;
+  border-radius: 12rpx;
+  background: #edf4fd;
+  color: #0b2a4a;
+}

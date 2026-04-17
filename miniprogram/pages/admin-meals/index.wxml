@@ -1,0 +1,126 @@
+<view class="container">
+  <view wx:if="{{!allowed}}" class="card">
+    <view class="section-title">无权限</view>
+    <view class="muted">仅食堂人员、管理员、超级管理员可访问菜品管理。</view>
+  </view>
+
+  <block wx:else>
+    <view class="card">
+      <view class="space-between">
+        <view class="section-title">菜品发布与停订管理</view>
+        <button class="subtle-btn" size="mini" bindtap="logout">退出登录</button>
+      </view>
+      <view class="space-between picker-row">
+        <text class="muted">管理日期</text>
+        <picker mode="date" value="{{mealDate}}" bindchange="onDateChange">
+          <view class="picker-value">{{mealDate}}</view>
+        </picker>
+      </view>
+      <view class="inline create-row">
+        <button class="subtle-btn mini-btn" size="mini" data-meal-type="breakfast" bindtap="createSlot">发布早餐</button>
+        <button class="subtle-btn mini-btn" size="mini" data-meal-type="lunch" bindtap="createSlot">发布中餐</button>
+        <button class="subtle-btn mini-btn" size="mini" data-meal-type="dinner" bindtap="createSlot">发布晚餐</button>
+      </view>
+    </view>
+
+    <view wx:if="{{loading}}" class="card">
+      <view class="empty-text">加载中...</view>
+    </view>
+
+    <view wx:elif="{{!slots.length}}" class="card">
+      <view class="empty-text">该日期暂无时段，请先点击发布早餐/中餐/晚餐</view>
+    </view>
+
+    <block wx:for="{{slots}}" wx:key="id" wx:for-item="slot" wx:for-index="slotIndex">
+      <view class="card">
+        <view class="space-between">
+          <view>
+            <view class="section-title">{{slot.mealTypeLabel}}</view>
+            <view class="muted">截止：{{slot.bookingDeadline}}</view>
+          </view>
+          <view class="switch-wrap">
+            <switch checked="{{slot.isOpen}}" data-slot-id="{{slot.id}}" bindchange="onSlotOpenChange" />
+            <view class="muted">{{slot.isOpen ? '开放订餐' : '已停止订餐'}}</view>
+          </view>
+        </view>
+
+        <view wx:for="{{slot.packages}}" wx:key="id" wx:for-item="pkg" wx:for-index="pkgIndex" class="pkg-edit-card">
+          <input
+            class="input"
+            placeholder="菜品名称"
+            value="{{pkg.packageName}}"
+            data-slot-index="{{slotIndex}}"
+            data-pkg-index="{{pkgIndex}}"
+            data-field="packageName"
+            bindinput="onPackageInput"
+          />
+          <input
+            class="input"
+            placeholder="单价"
+            type="digit"
+            value="{{pkg.priceInput}}"
+            data-slot-index="{{slotIndex}}"
+            data-pkg-index="{{pkgIndex}}"
+            data-field="priceInput"
+            bindinput="onPackageInput"
+          />
+          <picker
+            wx:if="{{!slot.isBreakfast}}"
+            mode="selector"
+            range="{{categoryLabels}}"
+            value="{{pkg.categoryIndex}}"
+            data-slot-index="{{slotIndex}}"
+            data-pkg-index="{{pkgIndex}}"
+            bindchange="onPackageCategoryChange"
+          >
+            <view class="picker-value">类别：{{categoryLabels[pkg.categoryIndex]}}</view>
+          </picker>
+          <view class="space-between">
+            <view class="muted">可选开关</view>
+            <switch
+              checked="{{pkg.selectable}}"
+              data-slot-index="{{slotIndex}}"
+              data-pkg-index="{{pkgIndex}}"
+              bindchange="onPackageSelectableChange"
+            />
+          </view>
+          <button class="primary-btn" size="mini" data-slot-index="{{slotIndex}}" data-pkg-index="{{pkgIndex}}" bindtap="savePackage">
+            保存菜品
+          </button>
+        </view>
+
+        <view class="add-card">
+          <view class="muted add-title">新增菜品</view>
+          <input
+            class="input"
+            placeholder="菜品名称（如：包子）"
+            value="{{slot.draft.packageName}}"
+            data-slot-index="{{slotIndex}}"
+            data-field="packageName"
+            bindinput="onDraftInput"
+          />
+          <input
+            class="input"
+            placeholder="单价"
+            type="digit"
+            value="{{slot.draft.priceInput}}"
+            data-slot-index="{{slotIndex}}"
+            data-field="priceInput"
+            bindinput="onDraftInput"
+          />
+          <picker
+            wx:if="{{!slot.isBreakfast}}"
+            mode="selector"
+            range="{{categoryLabels}}"
+            value="{{slot.draft.categoryIndex}}"
+            data-slot-index="{{slotIndex}}"
+            bindchange="onDraftCategoryChange"
+          >
+            <view class="picker-value">类别：{{categoryLabels[slot.draft.categoryIndex]}}</view>
+          </picker>
+          <button class="subtle-btn" size="mini" data-slot-index="{{slotIndex}}" bindtap="addPackage">新增到该时段</button>
+        </view>
+      </view>
+    </block>
+  </block>
+</view>

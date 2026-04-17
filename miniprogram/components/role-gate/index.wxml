@@ -1,0 +1,8 @@
+<block wx:if="{{allow}}">
+  <slot></slot>
+</block>
+<block wx:else>
+  <view class="denied-wrap">
+    <slot name="denied">当前角色无权限访问该区域</slot>
+  </view>
+</block>

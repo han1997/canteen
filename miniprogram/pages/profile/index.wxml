@@ -1,0 +1,42 @@
+<view class="container">
+  <view class="card">
+    <view class="section-title">个人中心</view>
+    <view class="muted">姓名：{{profile.real_name}}</view>
+    <view class="muted">警号：{{profile.police_no}}</view>
+    <view wx:if="{{showRole}}" class="muted">角色：{{roleLabel}}</view>
+    <view class="inline action-row">
+      <button class="subtle-btn" size="mini" bindtap="goMyOrders">我的订单</button>
+      <button wx:if="{{canManage}}" class="subtle-btn" size="mini" bindtap="goManage">管理中心</button>
+      <button class="warn-btn" size="mini" bindtap="logout">退出登录</button>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">修改密码</view>
+    <input
+      class="input"
+      placeholder="原密码"
+      password="true"
+      value="{{oldPassword}}"
+      data-field="oldPassword"
+      bindinput="onPwdInput"
+    />
+    <input
+      class="input"
+      placeholder="新密码（至少 6 位）"
+      password="true"
+      value="{{newPassword}}"
+      data-field="newPassword"
+      bindinput="onPwdInput"
+    />
+    <input
+      class="input"
+      placeholder="确认新密码"
+      password="true"
+      value="{{confirmPassword}}"
+      data-field="confirmPassword"
+      bindinput="onPwdInput"
+    />
+    <button class="primary-btn" loading="{{changingPassword}}" bindtap="submitChangePassword">确认修改密码</button>
+  </view>
+</view>

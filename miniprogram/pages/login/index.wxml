@@ -1,0 +1,62 @@
+<view class="container">
+  <view class="card brand-card">
+    <view class="brand-title">公安食堂订餐系统</view>
+    <view class="muted">警号登录 / 首次微信绑定</view>
+  </view>
+
+  <view class="card">
+    <view class="mode-switch">
+      <view
+        class="mode-item {{mode === 'login' ? 'mode-active' : ''}}"
+        data-mode="login"
+        bindtap="switchMode"
+      >
+        警号登录
+      </view>
+      <view
+        class="mode-item {{mode === 'bind' ? 'mode-active' : ''}}"
+        data-mode="bind"
+        bindtap="switchMode"
+      >
+        首次绑定
+      </view>
+    </view>
+
+    <block wx:if="{{mode === 'login'}}">
+      <input
+        class="input"
+        placeholder="警号"
+        value="{{loginPoliceNo}}"
+        data-field="loginPoliceNo"
+        bindinput="onInput"
+      />
+      <input
+        class="input"
+        placeholder="密码"
+        password="true"
+        value="{{loginPassword}}"
+        data-field="loginPassword"
+        bindinput="onInput"
+      />
+      <button class="primary-btn" loading="{{loading}}" bindtap="submitLogin">登录</button>
+    </block>
+
+    <block wx:else>
+      <input
+        class="input"
+        placeholder="警号"
+        value="{{bindPoliceNo}}"
+        data-field="bindPoliceNo"
+        bindinput="onInput"
+      />
+      <input
+        class="input"
+        placeholder="姓名"
+        value="{{bindRealName}}"
+        data-field="bindRealName"
+        bindinput="onInput"
+      />
+      <button class="primary-btn" loading="{{loading}}" bindtap="submitBind">绑定并登录</button>
+    </block>
+  </view>
+</view>

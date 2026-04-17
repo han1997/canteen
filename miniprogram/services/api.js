@@ -1,0 +1,218 @@
+const { request } = require("./request");
+
+function login(payload) {
+  return request({
+    url: "/auth/login",
+    method: "POST",
+    data: payload,
+    auth: false
+  });
+}
+
+function wechatBind(payload) {
+  return request({
+    url: "/auth/wechat-bind",
+    method: "POST",
+    data: payload,
+    auth: false
+  });
+}
+
+function getMe() {
+  return request({
+    url: "/auth/me"
+  });
+}
+
+function changePassword(payload) {
+  return request({
+    url: "/auth/change-password",
+    method: "POST",
+    data: payload
+  });
+}
+
+function getMealSlots(mealDate) {
+  return request({
+    url: "/meals/slots",
+    query: {
+      meal_date: mealDate
+    }
+  });
+}
+
+function createOrder(payload) {
+  return request({
+    url: "/orders",
+    method: "POST",
+    data: payload
+  });
+}
+
+function getMyOrders(fromDate, toDate) {
+  return request({
+    url: "/orders/my",
+    query: {
+      from_date: fromDate,
+      to_date: toDate
+    }
+  });
+}
+
+function cancelOrder(orderId, reason) {
+  return request({
+    url: `/orders/${orderId}/cancel`,
+    method: "POST",
+    data: {
+      reason: reason || null
+    }
+  });
+}
+
+function listAdminUsers(keyword) {
+  return request({
+    url: "/admin/users",
+    query: {
+      keyword
+    }
+  });
+}
+
+function createAdminUser(payload) {
+  return request({
+    url: "/admin/users",
+    method: "POST",
+    data: payload
+  });
+}
+
+function updateAdminUserRole(userId, role) {
+  return request({
+    url: `/admin/users/${userId}/role`,
+    method: "PATCH",
+    data: {
+      role
+    }
+  });
+}
+
+function updateAdminUserStatus(userId, status) {
+  return request({
+    url: `/admin/users/${userId}/status`,
+    method: "PATCH",
+    data: {
+      status
+    }
+  });
+}
+
+function getTodayDashboard(targetDate) {
+  return request({
+    url: "/admin/dashboard/today",
+    query: {
+      target_date: targetDate
+    }
+  });
+}
+
+function getAdminMealSlots(mealDate) {
+  return request({
+    url: "/admin/meal-slots",
+    query: {
+      meal_date: mealDate
+    }
+  });
+}
+
+function createOrUpdateAdminMealSlot(payload) {
+  return request({
+    url: "/admin/meal-slots",
+    method: "POST",
+    data: payload
+  });
+}
+
+function updateAdminMealSlotStatus(slotId, isOpen) {
+  return request({
+    url: `/admin/meal-slots/${slotId}/status`,
+    method: "PATCH",
+    data: {
+      is_open: !!isOpen
+    }
+  });
+}
+
+function createAdminMealPackage(slotId, payload) {
+  return request({
+    url: `/admin/meal-slots/${slotId}/packages`,
+    method: "POST",
+    data: payload
+  });
+}
+
+function updateAdminMealPackage(packageId, payload) {
+  return request({
+    url: `/admin/meal-packages/${packageId}`,
+    method: "PATCH",
+    data: payload
+  });
+}
+
+function getStatsSummary(fromDate, toDate) {
+  return request({
+    url: "/stats/summary",
+    query: {
+      from_date: fromDate,
+      to_date: toDate
+    }
+  });
+}
+
+function getBreakfastItemStats(fromDate, toDate) {
+  return request({
+    url: "/stats/breakfast-items",
+    query: {
+      from_date: fromDate,
+      to_date: toDate
+    }
+  });
+}
+
+function exportStats(payload) {
+  return request({
+    url: "/stats/export",
+    method: "POST",
+    data: payload
+  });
+}
+
+function getExportJob(jobNo) {
+  return request({
+    url: `/stats/export/${jobNo}`
+  });
+}
+
+module.exports = {
+  login,
+  wechatBind,
+  getMe,
+  changePassword,
+  getMealSlots,
+  createOrder,
+  getMyOrders,
+  cancelOrder,
+  listAdminUsers,
+  createAdminUser,
+  updateAdminUserRole,
+  updateAdminUserStatus,
+  getTodayDashboard,
+  getAdminMealSlots,
+  createOrUpdateAdminMealSlot,
+  updateAdminMealSlotStatus,
+  createAdminMealPackage,
+  updateAdminMealPackage,
+  getStatsSummary,
+  getBreakfastItemStats,
+  exportStats,
+  getExportJob
+};

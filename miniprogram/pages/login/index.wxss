@@ -1,0 +1,43 @@
+.brand-card {
+  margin-top: 24rpx;
+  background:
+    linear-gradient(140deg, rgba(8, 33, 63, 0.92) 0%, rgba(18, 63, 108, 0.9) 100%),
+    radial-gradient(circle at 88% 20%, rgba(255, 255, 255, 0.2) 0%, transparent 45%);
+  color: #ffffff;
+  border: 0;
+}
+
+.brand-title {
+  font-size: 42rpx;
+  font-weight: 800;
+  letter-spacing: 1.5rpx;
+  color: #ffffff;
+  margin-bottom: 10rpx;
+}
+
+.brand-card .muted {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.mode-switch {
+  display: flex;
+  background: #edf4fc;
+  border-radius: 14rpx;
+  padding: 6rpx;
+  margin-bottom: 22rpx;
+}
+
+.mode-item {
+  flex: 1;
+  text-align: center;
+  color: #415367;
+  font-size: 26rpx;
+  padding: 14rpx 0;
+  border-radius: 10rpx;
+}
+
+.mode-active {
+  background: linear-gradient(135deg, #0b2a4a 0%, #1d4d82 100%);
+  color: #ffffff;
+  box-shadow: 0 8rpx 18rpx rgba(11, 42, 74, 0.2);
+}

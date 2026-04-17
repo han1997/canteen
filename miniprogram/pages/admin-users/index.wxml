@@ -1,0 +1,111 @@
+<view class="container">
+  <view wx:if="{{!allowed}}" class="card">
+    <view class="section-title">无权限</view>
+    <view class="muted">仅管理员和超级管理员可访问用户管理。</view>
+  </view>
+
+  <block wx:else>
+    <view class="card">
+      <view class="space-between">
+        <view class="section-title">用户检索</view>
+        <button class="subtle-btn" size="mini" bindtap="logout">退出登录</button>
+      </view>
+      <input
+        class="input"
+        placeholder="按警号或姓名搜索"
+        value="{{keyword}}"
+        bindinput="onKeywordInput"
+      />
+      <view class="inline">
+        <button class="primary-btn half-btn" loading="{{loading}}" bindtap="searchUsers">查询</button>
+        <button class="subtle-btn half-btn" bindtap="clearKeyword">清空</button>
+      </view>
+      <button class="subtle-btn create-toggle" bindtap="toggleCreateForm">
+        {{showCreateForm ? '收起新增表单' : '新增用户'}}
+      </button>
+    </view>
+
+    <view wx:if="{{showCreateForm}}" class="card">
+      <view class="section-title">新增用户</view>
+      <input
+        class="input"
+        placeholder="警号"
+        value="{{createPoliceNo}}"
+        data-field="createPoliceNo"
+        bindinput="onCreateInput"
+      />
+      <input
+        class="input"
+        placeholder="姓名"
+        value="{{createRealName}}"
+        data-field="createRealName"
+        bindinput="onCreateInput"
+      />
+      <input
+        class="input"
+        placeholder="部门 ID（数字）"
+        type="number"
+        value="{{createDeptId}}"
+        data-field="createDeptId"
+        bindinput="onCreateInput"
+      />
+      <input
+        class="input"
+        placeholder="手机号（可选）"
+        value="{{createMobile}}"
+        data-field="createMobile"
+        bindinput="onCreateInput"
+      />
+      <picker mode="selector" range="{{roleLabels}}" value="{{createRoleIndex}}" bindchange="onCreateRoleChange">
+        <view class="picker-value">角色：{{roleLabels[createRoleIndex]}}</view>
+      </picker>
+      <input
+        class="input"
+        placeholder="初始密码（至少 6 位）"
+        password="true"
+        value="{{createPassword}}"
+        data-field="createPassword"
+        bindinput="onCreateInput"
+      />
+      <button class="primary-btn" loading="{{creating}}" bindtap="submitCreate">创建用户</button>
+    </view>
+
+    <view wx:if="{{loading}}" class="card">
+      <view class="empty-text">加载中...</view>
+    </view>
+
+    <view wx:elif="{{!users.length}}" class="card">
+      <view class="empty-text">暂无用户数据</view>
+    </view>
+
+    <block wx:for="{{users}}" wx:key="id" wx:for-item="user">
+      <view class="card user-card">
+        <view class="space-between">
+          <view class="user-name">{{user.realName}}（{{user.policeNo}}）</view>
+          <text class="{{user.statusClass}}">{{user.statusLabel}}</text>
+        </view>
+        <view class="muted">部门 ID：{{user.deptId}}</view>
+        <view class="inline action-row">
+          <picker
+            mode="selector"
+            range="{{roleLabels}}"
+            value="{{user.roleIndex}}"
+            data-user-id="{{user.id}}"
+            bindchange="changeUserRole"
+          >
+            <view class="picker-role">{{user.roleLabel}}</view>
+          </picker>
+          <button
+            class="{{user.status === 'active' ? 'warn-btn' : 'primary-btn'}}"
+            size="mini"
+            data-user-id="{{user.id}}"
+            data-current-status="{{user.status}}"
+            bindtap="toggleUserStatus"
+          >
+            {{user.status === 'active' ? '禁用' : '启用'}}
+          </button>
+        </view>
+      </view>
+    </block>
+  </block>
+</view>

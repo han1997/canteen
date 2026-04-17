@@ -1,0 +1,12 @@
+.action-row {
+  margin-top: 16rpx;
+}
+
+.action-row .subtle-btn,
+.action-row .warn-btn {
+  margin-left: 10rpx;
+}
+
+.action-row .subtle-btn:first-child {
+  margin-left: 0;
+}

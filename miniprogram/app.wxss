@@ -1,0 +1,125 @@
+page {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 12% 8%, #f3f8ff 0%, #f3f8ff 28%, transparent 62%),
+    radial-gradient(circle at 92% 20%, #ffeede 0%, #ffeede 24%, transparent 58%),
+    linear-gradient(160deg, #f7f9fc 0%, #edf3fa 55%, #e8eef7 100%);
+  color: #1a2233;
+  font-size: 28rpx;
+  font-family: "Source Han Sans SC", "Noto Sans CJK SC", "PingFang SC", sans-serif;
+}
+
+.container {
+  padding: 24rpx;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1rpx solid rgba(20, 44, 88, 0.08);
+  border-radius: 24rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 16rpx 38rpx rgba(18, 45, 84, 0.08);
+  animation: fade-up 320ms ease-out;
+}
+
+.section-title {
+  font-size: 31rpx;
+  font-weight: 700;
+  margin-bottom: 16rpx;
+  color: #0b2a4a;
+  letter-spacing: 1rpx;
+}
+
+.muted {
+  color: #65758d;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #0b2a4a 0%, #1c4b7f 100%);
+  color: #ffffff;
+  border-radius: 14rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  box-shadow: 0 8rpx 20rpx rgba(12, 43, 78, 0.26);
+}
+
+.warn-btn {
+  background: linear-gradient(135deg, #9d2d1f 0%, #d2452e 100%);
+  color: #ffffff;
+  border-radius: 14rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  box-shadow: 0 8rpx 18rpx rgba(163, 54, 35, 0.22);
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+}
+
+.space-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 80rpx;
+  padding: 0 22rpx;
+  border-radius: 14rpx;
+  background: #ffffff;
+  border: 1rpx solid #cad7ea;
+  margin-bottom: 16rpx;
+  color: #1a2233;
+}
+
+.subtle-btn {
+  background: linear-gradient(135deg, #eff4fb 0%, #dce9f8 100%);
+  color: #0b2a4a;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  margin-left: 12rpx;
+}
+
+.status-tag {
+  display: inline-block;
+  font-size: 22rpx;
+  line-height: 1;
+  padding: 9rpx 14rpx;
+  border-radius: 999rpx;
+}
+
+.status-booked {
+  color: #075985;
+  background: #dff3ff;
+}
+
+.status-verified {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.status-cancelled {
+  color: #9a3412;
+  background: #ffedd5;
+}
+
+.empty-text {
+  text-align: center;
+  color: #708097;
+  padding: 34rpx 0;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

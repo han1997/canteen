@@ -1,0 +1,58 @@
+<view class="container">
+  <view class="card">
+    <view class="section-title">查询条件</view>
+    <view class="space-between picker-row">
+      <text class="muted">开始日期</text>
+      <picker mode="date" value="{{fromDate}}" data-field="fromDate" bindchange="onDateChange">
+        <view class="picker-value">{{fromDate}}</view>
+      </picker>
+    </view>
+    <view class="space-between picker-row">
+      <text class="muted">结束日期</text>
+      <picker mode="date" value="{{toDate}}" data-field="toDate" bindchange="onDateChange">
+        <view class="picker-value">{{toDate}}</view>
+      </picker>
+    </view>
+    <input
+      class="input"
+      placeholder="取消原因"
+      value="{{cancelReason}}"
+      bindinput="onReasonInput"
+    />
+    <button class="primary-btn" loading="{{loading}}" bindtap="queryOrders">查询订单</button>
+  </view>
+
+  <view wx:if="{{loading}}" class="card">
+    <view class="empty-text">加载中...</view>
+  </view>
+
+  <view wx:elif="{{!orders.length}}" class="card">
+    <view class="empty-text">该时间段没有订单</view>
+  </view>
+
+  <block wx:for="{{orders}}" wx:key="id" wx:for-item="order">
+    <view class="card order-card">
+      <view class="space-between">
+        <view class="order-no">{{order.orderNo}}</view>
+        <text class="{{order.statusClass}}">{{order.statusLabel}}</text>
+      </view>
+      <view class="muted">时段：{{order.slotLabel}}</view>
+      <view class="muted">下单时间：{{order.bookedAtText}}</view>
+      <view wx:if="{{order.verifiedAtText !== '--'}}" class="muted">完成时间：{{order.verifiedAtText}}</view>
+      <view class="items-wrap">
+        <text wx:for="{{order.items}}" wx:key="index" wx:for-item="food" class="item-pill">
+          {{food.item_name}} {{food.quantity}}{{food.unit}}（¥{{food.unit_price}}/份）
+        </text>
+      </view>
+      <button
+        wx:if="{{order.canCancel}}"
+        class="warn-btn"
+        size="mini"
+        data-order-id="{{order.id}}"
+        bindtap="cancelOrder"
+      >
+        取消订单
+      </button>
+    </view>
+  </block>
+</view>

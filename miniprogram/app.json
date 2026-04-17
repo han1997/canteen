@@ -1,0 +1,40 @@
+{
+  "pages": [
+    "pages/login/index",
+    "pages/home/index",
+    "pages/profile/index",
+    "pages/my-orders/index",
+    "pages/admin-meals/index",
+    "pages/admin-users/index",
+    "pages/admin-stats/index"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#0B2A4A",
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "公安食堂订餐",
+    "backgroundColor": "#F5F7FA",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#666666",
+    "selectedColor": "#0B2A4A",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "订餐"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的"
+      },
+      {
+        "pagePath": "pages/admin-stats/index",
+        "text": "管理"
+      }
+    ]
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2"
+}

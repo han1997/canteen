@@ -1,0 +1,44 @@
+.picker-row {
+  margin-top: 12rpx;
+}
+
+.picker-value {
+  background: linear-gradient(135deg, #eef4fd 0%, #e0ebf9 100%);
+  border-radius: 12rpx;
+  padding: 16rpx 18rpx;
+  color: #0b2a4a;
+  margin-bottom: 16rpx;
+}
+
+.create-row {
+  margin-top: 6rpx;
+}
+
+.mini-btn {
+  margin-left: 0;
+  margin-right: 10rpx;
+}
+
+.switch-wrap {
+  text-align: right;
+}
+
+.pkg-edit-card {
+  margin-top: 16rpx;
+  padding: 16rpx;
+  border-radius: 14rpx;
+  background: #f4f8ff;
+  border: 1rpx solid #d8e5f8;
+}
+
+.add-card {
+  margin-top: 20rpx;
+  padding: 16rpx;
+  border-radius: 14rpx;
+  border: 1rpx dashed #9eb5d6;
+  background: #f9fbff;
+}
+
+.add-title {
+  margin-bottom: 12rpx;
+}

@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.tox/
+.coverage
+coverage.xml
+
+# Virtual environment
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Database
+*.db
+*.sqlite3
+
+# Exports
+exports/
+
+# Node.js (for miniprogram)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Miniprogram
+miniprogram/miniprogram_npm/
+miniprogram/.vscode/
+miniprogram/.git/
+miniprogram/*.log
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+.tmp/

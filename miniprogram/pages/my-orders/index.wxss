@@ -1,0 +1,37 @@
+.picker-row {
+  margin-bottom: 14rpx;
+}
+
+.picker-value {
+  color: #0b2a4a;
+  font-weight: 700;
+  background: #edf4fd;
+  padding: 10rpx 16rpx;
+  border-radius: 12rpx;
+}
+
+.order-card {
+  padding-top: 18rpx;
+  border-left: 8rpx solid #214f83;
+}
+
+.order-no {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0b2a4a;
+  margin-bottom: 6rpx;
+}
+
+.items-wrap {
+  margin: 12rpx 0;
+}
+
+.item-pill {
+  display: inline-block;
+  margin: 0 10rpx 10rpx 0;
+  padding: 8rpx 12rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  color: #26364a;
+  background: linear-gradient(135deg, #edf3fc 0%, #e0ebf9 100%);
+}
