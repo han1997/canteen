@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import case, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.security import get_current_user, get_password_hash, role_required
@@ -129,6 +130,29 @@ def _default_deadline(meal_date: date) -> datetime:
 
 def _generate_package_code() -> str:
     return f"pkg{datetime.utcnow().strftime('%H%M%S')}{randint(100, 999)}"
+
+
+def _package_code_exists(db: Session, slot_id: int, package_code: str) -> bool:
+    return db.scalar(
+        select(MealPackage.id).where(MealPackage.slot_id == slot_id, MealPackage.package_code == package_code)
+    ) is not None
+
+
+def _pick_available_package_code(db: Session, slot_id: int, preferred_code: str | None = None) -> str:
+    if preferred_code and not _package_code_exists(db, slot_id, preferred_code):
+        return preferred_code
+
+    for _ in range(10):
+        candidate = _generate_package_code()
+        if not _package_code_exists(db, slot_id, candidate):
+            return candidate
+
+    raise HTTPException(status_code=409, detail="套餐编码冲突，请重试")
+
+
+def _is_slot_package_code_conflict(exc: IntegrityError) -> bool:
+    message = str(exc.orig) if exc.orig is not None else str(exc)
+    return "uk_meal_packages_slot_code" in message
 
 
 def _load_slot(db: Session, slot_id: int) -> MealSlot:
@@ -371,31 +395,39 @@ def create_meal_package(
     if not slot:
         raise HTTPException(status_code=404, detail="订餐时段不存在")
 
-    package_code = payload.package_code or _generate_package_code()
-    exists = db.scalar(
-        select(MealPackage).where(MealPackage.slot_id == slot_id, MealPackage.package_code == package_code)
-    )
-    if exists:
-        package_code = _generate_package_code()
-
     meal_category = MealCategoryEnum.NORMAL if slot.meal_type == MealTypeEnum.BREAKFAST else MealCategoryEnum(payload.meal_category)
     max_sort = db.scalar(select(func.max(MealPackage.sort_order)).where(MealPackage.slot_id == slot_id)) or 0
 
-    pkg = MealPackage(
-        slot_id=slot_id,
-        package_code=package_code,
-        package_name=payload.package_name,
-        meal_category=meal_category,
-        is_selectable=payload.is_selectable,
-        price=payload.price,
-        calories=payload.calories,
-        protein_g=payload.protein_g,
-        carbs_g=payload.carbs_g,
-        fat_g=payload.fat_g,
-        sort_order=int(max_sort) + 1,
-    )
-    db.add(pkg)
-    db.flush()
+    pkg: MealPackage | None = None
+    preferred_code = payload.package_code
+    for _ in range(5):
+        package_code = _pick_available_package_code(db, slot_id, preferred_code=preferred_code)
+        preferred_code = None
+        try:
+            with db.begin_nested():
+                candidate_pkg = MealPackage(
+                    slot_id=slot_id,
+                    package_code=package_code,
+                    package_name=payload.package_name,
+                    meal_category=meal_category,
+                    is_selectable=payload.is_selectable,
+                    price=payload.price,
+                    calories=payload.calories,
+                    protein_g=payload.protein_g,
+                    carbs_g=payload.carbs_g,
+                    fat_g=payload.fat_g,
+                    sort_order=int(max_sort) + 1,
+                )
+                db.add(candidate_pkg)
+                db.flush()
+            pkg = candidate_pkg
+            break
+        except IntegrityError as exc:
+            if not _is_slot_package_code_conflict(exc):
+                raise
+
+    if pkg is None:
+        raise HTTPException(status_code=409, detail="套餐编码冲突，请重试")
 
     db.add(
         MealPackageItem(

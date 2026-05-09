@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 from app.models import ExportJob, MealSlot, Order, OrderItem, User
 
 
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
 MEAL_TYPE_LABEL = {
     "breakfast": "早餐",
     "lunch": "中餐",
@@ -184,7 +186,7 @@ def _group_rows(rows) -> list[dict]:
 
 
 def run_export_job(db: Session, job: ExportJob) -> ExportJob:
-    export_dir = Path("exports")
+    export_dir = BACKEND_ROOT / "exports"
     export_dir.mkdir(parents=True, exist_ok=True)
 
     job.status = "running"
@@ -252,7 +254,7 @@ def run_export_job(db: Session, job: ExportJob) -> ExportJob:
     _format_sheet(ws)
 
     file_name = f"订餐统计_{job.from_date.strftime('%Y%m%d')}_{job.to_date.strftime('%Y%m%d')}_{job.job_no}.xlsx"
-    output = export_dir / file_name
+    output = (export_dir / file_name).resolve()
     wb.save(output)
 
     job.status = "done"
