@@ -1,5 +1,6 @@
 const api = require("../../services/api");
 const { ROLE_LABEL } = require("../../utils/constants");
+const PROFILE_SYNC_INTERVAL = 5 * 60 * 1000;
 
 function toast(title, icon) {
   wx.showToast({
@@ -20,31 +21,69 @@ Page({
     changingPassword: false
   },
 
-  async onShow() {
-    await this.ensureAuth();
+  onLoad() {
+    this._profileSyncedAt = 0;
+    this._ensurePromise = null;
   },
 
-  async ensureAuth() {
+  onShow() {
+    this.ensureAuth(false);
+  },
+
+  async ensureAuth(force = false) {
+    if (this._ensurePromise) {
+      return this._ensurePromise;
+    }
+
+    this._ensurePromise = this._ensureAuthInternal(force).finally(() => {
+      this._ensurePromise = null;
+    });
+    return this._ensurePromise;
+  },
+
+  async _ensureAuthInternal(force = false) {
     const app = getApp();
     if (!app.globalData.token) {
       wx.reLaunch({ url: "/pages/login/index" });
       return;
     }
+
+    const now = Date.now();
     let profile = app.globalData.profile;
-    if (!profile) {
-      try {
+    const needSync = force || !profile || !this._profileSyncedAt || now - this._profileSyncedAt > PROFILE_SYNC_INTERVAL;
+    try {
+      if (needSync) {
         profile = await api.getMe();
         app.setAuth(app.globalData.token, profile);
-      } catch (err) {
-        toast(err.message || "登录状态异常");
-        return;
+        this._profileSyncedAt = now;
       }
+    } catch (err) {
+      toast(err.message || "登录状态异常");
+      return;
     }
+
+    const roleLabel = ROLE_LABEL[profile.role] || profile.role;
+    const showRole = profile.role !== "officer";
+    const canManage = ["kitchen", "admin", "super_admin"].includes(profile.role);
+    const current = this.data.profile;
+    if (
+      current &&
+      current.id === profile.id &&
+      current.role === profile.role &&
+      current.real_name === profile.real_name &&
+      current.police_no === profile.police_no &&
+      this.data.roleLabel === roleLabel &&
+      this.data.showRole === showRole &&
+      this.data.canManage === canManage
+    ) {
+      return;
+    }
+
     this.setData({
       profile,
-      roleLabel: ROLE_LABEL[profile.role] || profile.role,
-      showRole: profile.role !== "officer",
-      canManage: ["kitchen", "admin", "super_admin"].includes(profile.role)
+      roleLabel,
+      showRole,
+      canManage
     });
   },
 
