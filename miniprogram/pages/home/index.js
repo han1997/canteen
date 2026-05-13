@@ -3,6 +3,10 @@ const { CATEGORY_LABEL, MEAL_TYPE_LABEL } = require("../../utils/constants");
 const { formatDateTime, todayString } = require("../../utils/date");
 
 const PRIVILEGED_ROLES = ["kitchen", "admin", "super_admin"];
+const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000/api/v1";
+const DEFAULT_MEAL_IMAGE_LOCAL = "/assets/default-meal.png";
+const PROFILE_SYNC_INTERVAL = 5 * 60 * 1000;
+const HOME_REFRESH_INTERVAL = 45 * 1000;
 const ORDER_STATUS_LABEL = {
   booked: "已预订",
   verified: "已完成",
@@ -35,6 +39,30 @@ function toInt(value) {
   return Math.round(num);
 }
 
+function getApiOrigin() {
+  const app = getApp();
+  const baseUrl = (
+    (app && app.globalData && app.globalData.apiBaseUrl) ||
+    DEFAULT_API_BASE_URL
+  )
+    .replace(/\/+$/, "")
+    .replace(/\/api\/v1$/, "");
+  return baseUrl;
+}
+
+function toMealImageUrl(imageUrl) {
+  if (!imageUrl) {
+    return DEFAULT_MEAL_IMAGE_LOCAL;
+  }
+  if (/^https?:\/\//i.test(imageUrl)) {
+    return imageUrl;
+  }
+  if (imageUrl.startsWith("/static/")) {
+    return `${getApiOrigin()}${imageUrl}`;
+  }
+  return DEFAULT_MEAL_IMAGE_LOCAL;
+}
+
 Page({
   data: {
     mealDate: todayString(),
@@ -46,58 +74,116 @@ Page({
     canManage: false
   },
 
-  async onShow() {
-    await this.initAndLoad();
+  onLoad() {
+    this._profileSyncedAt = 0;
+    this._lastLoadedAt = 0;
+    this._loadPromise = null;
+  },
+
+  onShow() {
+    this.initAndLoad({ force: false, silent: true });
   },
 
   async onPullDownRefresh() {
-    await this.loadData();
+    await this.initAndLoad({ force: true, silent: false });
     wx.stopPullDownRefresh();
   },
 
-  async initAndLoad() {
+  async initAndLoad(options = {}) {
+    const force = !!options.force;
+    const silent = options.silent !== false;
     const app = getApp();
     if (!app.globalData.token) {
       wx.reLaunch({ url: "/pages/login/index" });
       return;
     }
 
-    let profile = app.globalData.profile;
     try {
-      if (!profile) {
-        profile = await api.getMe();
-        app.setAuth(app.globalData.token, profile);
-      }
-      this.setData({
-        profile,
-        canManage: PRIVILEGED_ROLES.includes(profile.role)
-      });
-      await this.loadData();
+      const profile = await this.ensureProfile(force);
+      this.applyProfile(profile);
+      await this.loadData({ force, silent });
     } catch (err) {
       toast(err.message || "加载用户信息失败");
     }
   },
 
-  async loadData() {
-    this.setData({ loading: true });
-    try {
-      const [slots, orders] = await Promise.all([
-        api.getMealSlots(this.data.mealDate),
-        api.getMyOrders(this.data.mealDate, this.data.mealDate)
-      ]);
-      const orderMap = {};
-      (orders || []).forEach((order) => {
-        orderMap[order.slot_id] = order;
-      });
-      const formattedSlots = (slots || []).map((slot) => this.formatSlot(slot, orderMap[slot.id]));
-      this.setData({
-        slots: formattedSlots
-      });
-    } catch (err) {
-      toast(err.message || "加载订餐信息失败");
-    } finally {
-      this.setData({ loading: false });
+  async ensureProfile(force = false) {
+    const app = getApp();
+    const now = Date.now();
+    let profile = app.globalData.profile;
+    const needSync = force || !profile || !this._profileSyncedAt || now - this._profileSyncedAt > PROFILE_SYNC_INTERVAL;
+    if (!needSync) {
+      return profile;
     }
+
+    profile = await api.getMe();
+    app.setAuth(app.globalData.token, profile);
+    this._profileSyncedAt = now;
+    return profile;
+  },
+
+  applyProfile(profile) {
+    const canManage = PRIVILEGED_ROLES.includes(profile.role);
+    const current = this.data.profile;
+    if (
+      current &&
+      current.id === profile.id &&
+      current.role === profile.role &&
+      current.real_name === profile.real_name &&
+      current.police_no === profile.police_no &&
+      this.data.canManage === canManage
+    ) {
+      return;
+    }
+
+    this.setData({
+      profile,
+      canManage
+    });
+  },
+
+  async loadData(options = {}) {
+    const force = !!options.force;
+    const silent = options.silent === true;
+    const now = Date.now();
+    if (!force && this._lastLoadedAt && this.data.slots.length && now - this._lastLoadedAt < HOME_REFRESH_INTERVAL) {
+      return;
+    }
+    if (this._loadPromise) {
+      return this._loadPromise;
+    }
+
+    const shouldShowLoading = !silent || !this.data.slots.length;
+    if (shouldShowLoading) {
+      this.setData({ loading: true });
+    }
+
+    this._loadPromise = Promise.all([
+      api.getMealSlots(this.data.mealDate),
+      api.getMyOrders(this.data.mealDate, this.data.mealDate)
+    ])
+      .then(([slots, orders]) => {
+        const orderMap = {};
+        (orders || []).forEach((order) => {
+          orderMap[order.slot_id] = order;
+        });
+        const formattedSlots = (slots || []).map((slot) => this.formatSlot(slot, orderMap[slot.id]));
+        this.setData({
+          slots: formattedSlots
+        });
+        this._lastLoadedAt = Date.now();
+      })
+      .catch((err) => {
+        toast(err.message || "加载订餐信息失败");
+      })
+      .finally(() => {
+        if (shouldShowLoading) {
+          this.setData({ loading: false });
+        }
+        this._loadPromise = null;
+      });
+
+    return this._loadPromise;
   },
 
   formatSlot(slot, existingOrder) {
@@ -116,6 +202,7 @@ Page({
       packageName: pkg.package_name,
       mealCategory: pkg.meal_category,
       categoryLabel: CATEGORY_LABEL[pkg.meal_category] || pkg.meal_category,
+      imageUrl: toMealImageUrl(pkg.image_url),
       price: pkg.price,
       calories: pkg.calories,
       proteinG: pkg.protein_g,
@@ -144,11 +231,19 @@ Page({
     };
   },
 
+  onPackageImageError(e) {
+    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
+    const packageIndex = Number(e.currentTarget.dataset.packageIndex);
+    this.setData({
+      [`slots[${slotIndex}].packages[${packageIndex}].imageUrl`]: DEFAULT_MEAL_IMAGE_LOCAL
+    });
+  },
+
   onDateChange(e) {
     this.setData({
       mealDate: e.detail.value
     });
-    this.loadData();
+    this.loadData({ force: true, silent: false });
   },
 
   onNoteInput(e) {
@@ -213,7 +308,7 @@ Page({
         note: slot.note || null
       });
       toast(`下单成功：${order.order_no}`, "success");
-      await this.loadData();
+      await this.loadData({ force: true, silent: false });
     } catch (err) {
       toast(err.message || "下单失败");
     } finally {

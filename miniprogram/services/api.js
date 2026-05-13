@@ -158,6 +158,40 @@ function updateAdminMealPackage(packageId, payload) {
   });
 }
 
+function uploadAdminMealImage(filePath) {
+  const app = getApp();
+  const token = (app && app.globalData && app.globalData.token) || wx.getStorageSync("token") || "";
+  const baseUrl =
+    (app && app.globalData && app.globalData.apiBaseUrl) || "http://127.0.0.1:8000/api/v1";
+  const normalizedBaseUrl = String(baseUrl).replace(/\/$/, "");
+
+  return new Promise((resolve, reject) => {
+    wx.uploadFile({
+      url: `${normalizedBaseUrl}/admin/uploads/meal-image`,
+      filePath,
+      name: "image",
+      header: token ? { Authorization: `Bearer ${token}` } : {},
+      success: (res) => {
+        let payload = null;
+        try {
+          payload = JSON.parse(res.data || "{}");
+        } catch (err) {
+          reject(new Error("上传返回格式异常"));
+          return;
+        }
+        if (res.statusCode >= 200 && res.statusCode < 300 && payload && payload.image_url) {
+          resolve(payload.image_url);
+          return;
+        }
+        reject(new Error((payload && (payload.detail || payload.message)) || "上传图片失败"));
+      },
+      fail: (err) => {
+        reject(new Error((err && err.errMsg) || "上传图片失败"));
+      }
+    });
+  });
+}
+
 function getStatsSummary(fromDate, toDate) {
   return request({
     url: "/stats/summary",
@@ -211,6 +245,7 @@ module.exports = {
   updateAdminMealSlotStatus,
   createAdminMealPackage,
   updateAdminMealPackage,
+  uploadAdminMealImage,
   getStatsSummary,
   getBreakfastItemStats,
   exportStats,

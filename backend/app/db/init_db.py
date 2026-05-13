@@ -27,6 +27,11 @@ def _ensure_legacy_columns() -> None:
         "unit_price",
         "ALTER TABLE order_items ADD COLUMN unit_price DECIMAL(10,2) NOT NULL DEFAULT 0",
     )
+    _ensure_column(
+        "meal_packages",
+        "image_url",
+        "ALTER TABLE meal_packages ADD COLUMN image_url VARCHAR(255) NULL",
+    )
 
 
 def init_db() -> None:

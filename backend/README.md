@@ -5,6 +5,7 @@
 - 数据库：MySQL 8.0（见 `sql/schema.sql`）
 - 鉴权：JWT（警号登录 + 绑定流程）
 - 导出：OpenPyXL 生成 Excel
+- 菜品图片：后端静态目录 `/static`（默认图与上传图）
 
 ## 2. 启动步骤
 ```bash
@@ -20,6 +21,15 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 访问：
 - 健康检查：`GET /healthz`
 - Swagger：`/docs`
+
+默认菜品图：
+- 路径：`backend/static/default-meal.png`
+- 环境变量：`DEFAULT_MEAL_IMAGE_URL`（默认值 `/static/default-meal.png`）
+
+菜品图片上传：
+- 接口：`POST /api/v1/admin/uploads/meal-image`
+- 字段：`image`（`jpg/png/webp`，最大 `3MB`）
+- 返回：`{"image_url": "/static/uploads/meals/xxx.png"}`
 
 开发环境自动初始化（`APP_ENV != production`）：
 - 启动时会自动补齐未来 `BOOKING_SEED_DAYS` 天餐次（早/中/晚）与测试菜品。

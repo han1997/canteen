@@ -1,6 +1,6 @@
 <view class="container">
-  <view class="card">
-    <view class="space-between">
+  <view class="card hero-home">
+    <view class="space-between home-head">
       <view>
         <view class="section-title">订餐主页</view>
         <view class="muted">{{profile.real_name}}（{{profile.police_no}}）</view>
@@ -39,7 +39,7 @@
   <block wx:for="{{slots}}" wx:key="id" wx:for-item="slot" wx:for-index="slotIndex">
     <view class="card slot-card">
       <view class="space-between">
-        <view class="section-title">{{slot.mealTypeLabel}}</view>
+        <view class="slot-title">{{slot.mealTypeLabel}}</view>
         <text class="{{slot.canBook ? 'status-tag status-verified' : 'status-tag status-cancelled'}}">
           {{slot.slotStatus}}
         </text>
@@ -61,37 +61,44 @@
 
       <block wx:for="{{slot.packages}}" wx:key="id" wx:for-item="pkg" wx:for-index="pkgIndex">
         <view class="package-card {{pkg.qty > 0 ? 'package-selected' : ''}}">
-          <view class="space-between">
-            <view class="pkg-title">{{pkg.packageName}}</view>
-            <text class="pkg-cat">{{slot.isBreakfast ? '单点' : pkg.categoryLabel}}</text>
-          </view>
-          <view class="price-line">单价：¥{{pkg.price || 0}}</view>
-          <view wx:if="{{!slot.isBreakfast}}" class="muted nutrition-line">
-            热量 {{pkg.calories || '-'}} kcal，
-            蛋白 {{pkg.proteinG || '-'}}g，
-            碳水 {{pkg.carbsG || '-'}}g，
-            脂肪 {{pkg.fatG || '-'}}g
-          </view>
-
-          <view class="qty-row">
-            <view
-              class="qty-btn {{!slot.canBook ? 'qty-disabled' : ''}}"
-              data-slot-index="{{slotIndex}}"
-              data-package-index="{{pkgIndex}}"
-              data-delta="-1"
-              bindtap="adjustQty"
-            >
-              -
+          <image
+            class="package-image"
+            src="{{pkg.imageUrl}}"
+            mode="aspectFill"
+            data-slot-index="{{slotIndex}}"
+            data-package-index="{{pkgIndex}}"
+            binderror="onPackageImageError"
+            lazy-load="true"
+          />
+          <view class="pkg-main">
+            <view class="space-between">
+              <view class="pkg-title">{{pkg.packageName}}</view>
+              <text class="pkg-cat">{{slot.isBreakfast ? '单点' : pkg.categoryLabel}}</text>
             </view>
-            <view class="qty-value">{{pkg.qty}}</view>
-            <view
-              class="qty-btn {{!slot.canBook ? 'qty-disabled' : ''}}"
-              data-slot-index="{{slotIndex}}"
-              data-package-index="{{pkgIndex}}"
-              data-delta="1"
-              bindtap="adjustQty"
-            >
-              +
+            <view class="price-line">¥{{pkg.price || 0}}</view>
+            <view wx:if="{{!slot.isBreakfast}}" class="muted nutrition-line">
+              {{pkg.calories || '-'}} kcal · 蛋白 {{pkg.proteinG || '-'}}g · 碳水 {{pkg.carbsG || '-'}}g
+            </view>
+            <view class="qty-row">
+              <view
+                class="qty-btn {{!slot.canBook ? 'qty-disabled' : ''}}"
+                data-slot-index="{{slotIndex}}"
+                data-package-index="{{pkgIndex}}"
+                data-delta="-1"
+                bindtap="adjustQty"
+              >
+                -
+              </view>
+              <view class="qty-value">{{pkg.qty}}</view>
+              <view
+                class="qty-btn {{!slot.canBook ? 'qty-disabled' : ''}}"
+                data-slot-index="{{slotIndex}}"
+                data-package-index="{{pkgIndex}}"
+                data-delta="1"
+                bindtap="adjustQty"
+              >
+                +
+              </view>
             </view>
           </view>
         </view>

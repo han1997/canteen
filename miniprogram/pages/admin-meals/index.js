@@ -11,6 +11,11 @@ const CATEGORY_OPTIONS = [
   { label: "普通套餐", value: "normal" },
   { label: "减脂套餐", value: "fat_loss" }
 ];
+const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000/api/v1";
+const DEFAULT_MEAL_IMAGE_LOCAL = "/assets/default-meal.png";
+const DEFAULT_MEAL_IMAGE_URL = "/static/default-meal.png";
+const UPLOAD_IMAGE_EDGE = 960;
+const UPLOAD_IMAGE_QUALITY = 76;
 
 function toast(title, icon) {
   wx.showToast({
@@ -22,6 +27,76 @@ function toast(title, icon) {
 function categoryIndex(category) {
   const idx = CATEGORY_OPTIONS.findIndex((item) => item.value === category);
   return idx >= 0 ? idx : 0;
+}
+
+function resolveImageUrl(url) {
+  if (!url) {
+    return DEFAULT_MEAL_IMAGE_URL;
+  }
+  return url;
+}
+
+function getApiOrigin() {
+  const app = getApp();
+  const baseUrl = (
+    (app && app.globalData && app.globalData.apiBaseUrl) ||
+    DEFAULT_API_BASE_URL
+  )
+    .replace(/\/+$/, "")
+    .replace(/\/api\/v1$/, "");
+  return baseUrl;
+}
+
+function toPreviewImageUrl(url) {
+  if (!url) {
+    return DEFAULT_MEAL_IMAGE_LOCAL;
+  }
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+  if (url.startsWith("/static/")) {
+    return `${getApiOrigin()}${url}`;
+  }
+  return url;
+}
+
+function chooseImageFile() {
+  return new Promise((resolve, reject) => {
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ["image"],
+      sourceType: ["album", "camera"],
+      sizeType: ["compressed"],
+      success: (res) => {
+        const filePath = res && res.tempFiles && res.tempFiles[0] ? res.tempFiles[0].tempFilePath : "";
+        if (!filePath) {
+          reject(new Error("未选择图片"));
+          return;
+        }
+        resolve(filePath);
+      },
+      fail: (err) => {
+        reject(err);
+      }
+    });
+  });
+}
+
+function compressImageFile(filePath) {
+  return new Promise((resolve, reject) => {
+    wx.compressImage({
+      src: filePath,
+      compressedWidth: UPLOAD_IMAGE_EDGE,
+      compressedHeight: UPLOAD_IMAGE_EDGE,
+      quality: UPLOAD_IMAGE_QUALITY,
+      success: (res) => {
+        resolve((res && res.tempFilePath) || filePath);
+      },
+      fail: () => {
+        resolve(filePath);
+      }
+    });
+  });
 }
 
 Page({
@@ -73,12 +148,16 @@ Page({
       packages: (slot.packages || []).map((pkg) => ({
         id: pkg.id,
         packageName: pkg.package_name,
+        imageUrl: resolveImageUrl(pkg.image_url),
+        imagePreviewUrl: toPreviewImageUrl(resolveImageUrl(pkg.image_url)),
         priceInput: String(pkg.price || 0),
         selectable: !!pkg.is_selectable,
         categoryIndex: categoryIndex(pkg.meal_category)
       })),
       draft: {
         packageName: "",
+        imageUrl: DEFAULT_MEAL_IMAGE_URL,
+        imagePreviewUrl: toPreviewImageUrl(DEFAULT_MEAL_IMAGE_URL),
         priceInput: "",
         categoryIndex: 0
       }
@@ -175,6 +254,7 @@ Page({
 
     const payload = {
       package_name: pkg.packageName.trim(),
+      image_url: resolveImageUrl(pkg.imageUrl),
       price,
       is_selectable: pkg.selectable
     };
@@ -223,6 +303,7 @@ Page({
 
     const payload = {
       package_name: name,
+      image_url: resolveImageUrl(draft.imageUrl),
       price
     };
     if (!slot.isBreakfast) {
@@ -235,6 +316,51 @@ Page({
       await this.loadSlots();
     } catch (err) {
       toast(err.message || "新增菜品失败");
+    }
+  },
+
+  async choosePackageImage(e) {
+    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
+    const pkgIndex = Number(e.currentTarget.dataset.pkgIndex);
+    try {
+      const filePath = await chooseImageFile();
+      const compressedPath = await compressImageFile(filePath);
+      wx.showLoading({ title: "上传中" });
+      const imageUrl = await api.uploadAdminMealImage(compressedPath);
+      this.setData({
+        [`slots[${slotIndex}].packages[${pkgIndex}].imageUrl`]: imageUrl,
+        [`slots[${slotIndex}].packages[${pkgIndex}].imagePreviewUrl`]: toPreviewImageUrl(imageUrl)
+      });
+      toast("图片已上传", "success");
+    } catch (err) {
+      if (err && err.errMsg && String(err.errMsg).includes("cancel")) {
+        return;
+      }
+      toast(err.message || "上传图片失败");
+    } finally {
+      wx.hideLoading();
+    }
+  },
+
+  async chooseDraftImage(e) {
+    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
+    try {
+      const filePath = await chooseImageFile();
+      const compressedPath = await compressImageFile(filePath);
+      wx.showLoading({ title: "上传中" });
+      const imageUrl = await api.uploadAdminMealImage(compressedPath);
+      this.setData({
+        [`slots[${slotIndex}].draft.imageUrl`]: imageUrl,
+        [`slots[${slotIndex}].draft.imagePreviewUrl`]: toPreviewImageUrl(imageUrl)
+      });
+      toast("图片已上传", "success");
+    } catch (err) {
+      if (err && err.errMsg && String(err.errMsg).includes("cancel")) {
+        return;
+      }
+      toast(err.message || "上传图片失败");
+    } finally {
+      wx.hideLoading();
     }
   },
 

@@ -4,6 +4,8 @@ const { addDays, todayString } = require("../../utils/date");
 
 const STATS_ROLES = ["kitchen", "admin", "super_admin"];
 const ADMIN_ROLES = ["admin", "super_admin"];
+const PROFILE_SYNC_INTERVAL = 5 * 60 * 1000;
+const STATS_REFRESH_INTERVAL = 60 * 1000;
 
 const MEAL_TYPE_OPTIONS = [
   { label: "全部时段", value: "all" },
@@ -41,6 +43,33 @@ function formatPackageStats(rows) {
   }));
 }
 
+function packageStatsEqual(prev, next) {
+  if (prev === next) {
+    return true;
+  }
+  if (!Array.isArray(prev) || !Array.isArray(next)) {
+    return false;
+  }
+  if (prev.length !== next.length) {
+    return false;
+  }
+  for (let i = 0; i < prev.length; i += 1) {
+    const a = prev[i];
+    const b = next[i];
+    if (
+      !a ||
+      !b ||
+      a.key !== b.key ||
+      a.mealType !== b.mealType ||
+      a.packageName !== b.packageName ||
+      Number(a.totalQuantity) !== Number(b.totalQuantity)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 Page({
   data: {
     allowed: false,
@@ -63,35 +92,67 @@ Page({
     exporting: false
   },
 
-  async onShow() {
-    await this.ensureAccess();
-    if (this.data.allowed) {
-      await this.loadAll();
-    }
+  onLoad() {
+    this._profileSyncedAt = 0;
+    this._lastLoadedAt = 0;
+    this._loadPromise = null;
+    this._accessPromise = null;
   },
 
-  async ensureAccess() {
+  onShow() {
+    this.ensureAccess(false).then(() => {
+      if (this.data.allowed) {
+        this.loadAll({ force: false, silent: true });
+      }
+    });
+  },
+
+  async ensureAccess(force = false) {
+    if (this._accessPromise) {
+      return this._accessPromise;
+    }
+    this._accessPromise = this._ensureAccessInternal(force).finally(() => {
+      this._accessPromise = null;
+    });
+    return this._accessPromise;
+  },
+
+  async _ensureAccessInternal(force = false) {
     const app = getApp();
     if (!app.globalData.token) {
       wx.reLaunch({ url: "/pages/login/index" });
       return;
     }
 
+    const now = Date.now();
     let profile = app.globalData.profile;
-    if (!profile) {
-      try {
+    const needSync = force || !profile || !this._profileSyncedAt || now - this._profileSyncedAt > PROFILE_SYNC_INTERVAL;
+    try {
+      if (needSync) {
         profile = await api.getMe();
         app.setAuth(app.globalData.token, profile);
-      } catch (err) {
-        toast(err.message || "登录状态异常");
-        return;
+        this._profileSyncedAt = now;
       }
+    } catch (err) {
+      toast(err.message || "登录状态异常");
+      return;
+    }
+
+    const allowed = STATS_ROLES.includes(profile.role);
+    const isAdmin = ADMIN_ROLES.includes(profile.role);
+    const roleLabel = ROLE_LABEL[profile.role] || profile.role;
+    if (
+      this.data.allowed === allowed &&
+      this.data.isAdmin === isAdmin &&
+      this.data.roleLabel === roleLabel
+    ) {
+      return;
     }
 
     this.setData({
-      allowed: STATS_ROLES.includes(profile.role),
-      isAdmin: ADMIN_ROLES.includes(profile.role),
-      roleLabel: ROLE_LABEL[profile.role] || profile.role
+      allowed,
+      isAdmin,
+      roleLabel
     });
   },
 
@@ -110,37 +171,91 @@ Page({
     return true;
   },
 
-  async loadAll() {
+  async loadAll(options = {}) {
+    const force = !!options.force;
+    const silent = options.silent === true;
     if (!this.validateDateRange()) {
       return;
     }
-    this.setData({ loading: true });
-    try {
-      const tasks = [this.loadSummary(), this.loadBreakfastStats()];
-      if (this.data.isAdmin) {
-        tasks.push(this.loadDashboard());
-      }
-      await Promise.all(tasks);
-    } catch (err) {
-      toast(err.message || "加载统计失败");
-    } finally {
-      this.setData({ loading: false });
+
+    const now = Date.now();
+    const hasBaseData = !!this.data.summary || !!this.data.breakfastItems.length || !!this.data.dashboard;
+    if (!force && this._lastLoadedAt && hasBaseData && now - this._lastLoadedAt < STATS_REFRESH_INTERVAL) {
+      return;
     }
+    if (this._loadPromise) {
+      return this._loadPromise;
+    }
+
+    if (!silent || !hasBaseData) {
+      this.setData({ loading: true });
+    }
+
+    const tasks = [this.loadSummary(), this.loadBreakfastStats()];
+    if (this.data.isAdmin) {
+      tasks.push(this.loadDashboard());
+    }
+
+    this._loadPromise = Promise.all(tasks)
+      .then(() => {
+        this._lastLoadedAt = Date.now();
+      })
+      .catch((err) => {
+        toast(err.message || "加载统计失败");
+      })
+      .finally(() => {
+        if (!silent || !hasBaseData) {
+          this.setData({ loading: false });
+        }
+        this._loadPromise = null;
+      });
+
+    return this._loadPromise;
   },
 
   async loadSummary() {
     const summary = await api.getStatsSummary(this.data.fromDate, this.data.toDate);
+    const nextPackageStats = formatPackageStats((summary && summary.package_stats) || []);
+    const prevSummary = this.data.summary;
+    const summaryUnchanged =
+      !!prevSummary &&
+      prevSummary.total_orders === summary.total_orders &&
+      prevSummary.breakfast_orders === summary.breakfast_orders &&
+      prevSummary.lunch_orders === summary.lunch_orders &&
+      prevSummary.dinner_orders === summary.dinner_orders;
+    const packageStatsUnchanged = packageStatsEqual(this.data.summaryPackageStats, nextPackageStats);
+    if (
+      summaryUnchanged &&
+      packageStatsUnchanged
+    ) {
+      return;
+    }
     this.setData({
       summary,
-      summaryPackageStats: formatPackageStats((summary && summary.package_stats) || [])
+      summaryPackageStats: nextPackageStats
     });
   },
 
   async loadDashboard() {
     const dashboard = await api.getTodayDashboard(todayString());
+    const nextPackageStats = formatPackageStats((dashboard && dashboard.package_stats) || []);
+    const prevDashboard = this.data.dashboard;
+    const dashboardUnchanged =
+      !!prevDashboard &&
+      prevDashboard.total_orders === dashboard.total_orders &&
+      prevDashboard.breakfast_orders === dashboard.breakfast_orders &&
+      prevDashboard.lunch_orders === dashboard.lunch_orders &&
+      prevDashboard.dinner_orders === dashboard.dinner_orders;
+    const packageStatsUnchanged = packageStatsEqual(this.data.dashboardPackageStats, nextPackageStats);
+    if (
+      dashboardUnchanged &&
+      packageStatsUnchanged
+    ) {
+      return;
+    }
     this.setData({
       dashboard,
-      dashboardPackageStats: formatPackageStats((dashboard && dashboard.package_stats) || [])
+      dashboardPackageStats: nextPackageStats
     });
   },
 
@@ -169,7 +284,7 @@ Page({
       fromDate: today,
       toDate: today
     });
-    await this.loadAll();
+    await this.loadAll({ force: true, silent: false });
   },
 
   async queryTomorrow() {
@@ -178,7 +293,7 @@ Page({
       fromDate: tomorrow,
       toDate: tomorrow
     });
-    await this.loadAll();
+    await this.loadAll({ force: true, silent: false });
   },
 
   onMealTypeChange(e) {

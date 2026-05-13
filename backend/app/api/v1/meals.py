@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.security import get_current_user
+from app.core.config import settings
 from app.db.session import get_db
 from app.models import MealPackage, MealSlot, User
 from app.schemas.meal import MealItemOut, MealPackageOut, MealSlotOut
@@ -51,6 +52,7 @@ def list_slots(
                     package_code=pkg.package_code,
                     package_name=pkg.package_name,
                     meal_category=pkg.meal_category.value,
+                    image_url=pkg.image_url or settings.default_meal_image_url,
                     price=float(pkg.price) if pkg.price is not None else None,
                     calories=pkg.calories,
                     protein_g=float(pkg.protein_g) if pkg.protein_g is not None else None,

@@ -1,13 +1,16 @@
 from datetime import date, datetime, time
+from pathlib import Path
 from random import randint
 from typing import Annotated
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.security import get_current_user, get_password_hash, role_required
+from app.core.config import settings
 from app.db.session import get_db
 from app.models import (
     MealCategoryEnum,
@@ -94,6 +97,7 @@ def _to_meal_package_out(pkg: MealPackage) -> AdminMealPackageOut:
         package_name=pkg.package_name,
         meal_category=pkg.meal_category.value,
         is_selectable=pkg.is_selectable,
+        image_url=pkg.image_url or settings.default_meal_image_url,
         price=float(pkg.price) if pkg.price is not None else None,
         calories=pkg.calories,
         protein_g=float(pkg.protein_g) if pkg.protein_g is not None else None,
@@ -153,6 +157,21 @@ def _pick_available_package_code(db: Session, slot_id: int, preferred_code: str 
 def _is_slot_package_code_conflict(exc: IntegrityError) -> bool:
     message = str(exc.orig) if exc.orig is not None else str(exc)
     return "uk_meal_packages_slot_code" in message
+
+
+def _normalize_image_ext(content_type: str, filename: str | None) -> str:
+    mapping = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+    }
+    if content_type in mapping:
+        return mapping[content_type]
+    if filename and "." in filename:
+        ext = Path(filename).suffix.lower()
+        if ext in {".jpg", ".jpeg", ".png", ".webp"}:
+            return ".jpg" if ext == ".jpeg" else ext
+    raise HTTPException(status_code=400, detail="仅支持 jpg/png/webp 图片")
 
 
 def _load_slot(db: Session, slot_id: int) -> MealSlot:
@@ -411,6 +430,7 @@ def create_meal_package(
                     package_name=payload.package_name,
                     meal_category=meal_category,
                     is_selectable=payload.is_selectable,
+                    image_url=payload.image_url or settings.default_meal_image_url,
                     price=payload.price,
                     calories=payload.calories,
                     protein_g=payload.protein_g,
@@ -471,6 +491,8 @@ def update_meal_package(
     if not pkg:
         raise HTTPException(status_code=404, detail="菜品不存在")
 
+    provided_fields = payload.model_fields_set
+
     if payload.package_name is not None:
         pkg.package_name = payload.package_name
         if pkg.items:
@@ -489,6 +511,8 @@ def update_meal_package(
                 )
             )
 
+    if "image_url" in provided_fields:
+        pkg.image_url = payload.image_url
     if payload.price is not None:
         pkg.price = payload.price
     if payload.calories is not None:
@@ -518,3 +542,38 @@ def update_meal_package(
     db.commit()
     pkg = db.scalar(select(MealPackage).where(MealPackage.id == pkg.id).options(joinedload(MealPackage.items)))
     return _to_meal_package_out(pkg)
+
+
+@router.post("/uploads/meal-image", dependencies=MEAL_MANAGE_DEPS)
+async def upload_meal_image(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    image: UploadFile = File(...),
+):
+    ext = _normalize_image_ext(image.content_type or "", image.filename)
+    payload = await image.read()
+    max_bytes = 3 * 1024 * 1024
+    if not payload:
+        raise HTTPException(status_code=400, detail="图片内容为空")
+    if len(payload) > max_bytes:
+        raise HTTPException(status_code=400, detail="图片大小不能超过 3MB")
+
+    upload_dir = Path(__file__).resolve().parents[3] / "static" / "uploads" / "meals"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"meal-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{uuid4().hex[:8]}{ext}"
+    output_path = upload_dir / filename
+    output_path.write_bytes(payload)
+    image_url = f"/static/uploads/meals/{filename}"
+
+    write_audit(
+        db,
+        actor_user_id=current_user.id,
+        action="UPLOAD_MEAL_IMAGE",
+        target_type="meal_package_image",
+        target_id=filename,
+        request_ip=request.client.host if request.client else None,
+        detail_json={"image_url": image_url},
+    )
+    db.commit()
+    return {"image_url": image_url}

@@ -20,6 +20,10 @@ from app.models import (
 )
 
 
+def _default_image_url() -> str:
+    return settings.default_meal_image_url
+
+
 def _ensure_root_department(db) -> Department:
     dept = db.scalar(select(Department).where(Department.dept_code == "ROOT"))
     if dept:
@@ -79,6 +83,7 @@ def _upsert_package_with_single_item(
             package_name=name,
             meal_category=MealCategoryEnum.NORMAL,
             is_selectable=True,
+            image_url=_default_image_url(),
             price=price,
             calories=calories,
             protein_g=None,
@@ -92,6 +97,8 @@ def _upsert_package_with_single_item(
         pkg.package_name = name
         pkg.meal_category = MealCategoryEnum.NORMAL
         pkg.is_selectable = True
+        if not pkg.image_url:
+            pkg.image_url = _default_image_url()
         pkg.price = price
         pkg.calories = calories
         pkg.protein_g = None
@@ -144,6 +151,7 @@ def _upsert_main_meal_package(
             package_name=name,
             meal_category=category,
             is_selectable=True,
+            image_url=_default_image_url(),
             price=price,
             calories=nutrition["calories"],
             protein_g=nutrition["protein_g"],
@@ -157,6 +165,8 @@ def _upsert_main_meal_package(
         pkg.package_name = name
         pkg.meal_category = category
         pkg.is_selectable = True
+        if not pkg.image_url:
+            pkg.image_url = _default_image_url()
         pkg.price = price
         pkg.calories = nutrition["calories"]
         pkg.protein_g = nutrition["protein_g"]

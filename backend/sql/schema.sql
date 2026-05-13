@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS meal_packages (
   package_name VARCHAR(128) NOT NULL,
   meal_category ENUM('normal','fat_loss') NOT NULL,
   is_selectable TINYINT(1) NOT NULL DEFAULT 1,
+  image_url VARCHAR(255) NULL,
   price DECIMAL(10,2) NULL DEFAULT 0,
   calories INT NULL,
   protein_g DECIMAL(8,2) NULL,

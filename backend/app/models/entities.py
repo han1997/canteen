@@ -119,6 +119,7 @@ class MealPackage(Base, TimestampMixin):
         nullable=False,
     )
     is_selectable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    image_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     price: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
     calories: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     protein_g: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
