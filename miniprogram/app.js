@@ -1,13 +1,20 @@
+const { getRuntimeEnv, getApiBaseUrl } = require("./config/env");
+
 App({
   globalData: {
-    apiBaseUrl: "http://127.0.0.1:8000/api/v1",
+    env: "",
+    apiBaseUrl: "",
     token: "",
     profile: null
   },
 
   onLaunch() {
+    const env = getRuntimeEnv();
+    const apiBaseUrl = getApiBaseUrl(env);
     const token = wx.getStorageSync("token") || "";
     const profile = wx.getStorageSync("profile") || null;
+    this.globalData.env = env;
+    this.globalData.apiBaseUrl = apiBaseUrl;
     this.globalData.token = token;
     this.globalData.profile = profile;
   },

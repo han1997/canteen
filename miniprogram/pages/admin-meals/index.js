@@ -1,5 +1,6 @@
 const api = require("../../services/api");
 const { todayString } = require("../../utils/date");
+const { getApiBaseUrl } = require("../../config/env");
 
 const MANAGE_ROLES = ["kitchen", "admin", "super_admin"];
 const MEAL_TYPES = [
@@ -11,7 +12,7 @@ const CATEGORY_OPTIONS = [
   { label: "普通套餐", value: "normal" },
   { label: "减脂套餐", value: "fat_loss" }
 ];
-const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000/api/v1";
+const DEFAULT_API_BASE_URL = getApiBaseUrl();
 const DEFAULT_MEAL_IMAGE_LOCAL = "/assets/default-meal.png";
 const DEFAULT_MEAL_IMAGE_URL = "/static/default-meal.png";
 const UPLOAD_IMAGE_EDGE = 960;

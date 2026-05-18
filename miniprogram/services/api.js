@@ -1,4 +1,5 @@
 const { request } = require("./request");
+const { getApiBaseUrl } = require("../config/env");
 
 function login(payload) {
   return request({
@@ -162,7 +163,7 @@ function uploadAdminMealImage(filePath) {
   const app = getApp();
   const token = (app && app.globalData && app.globalData.token) || wx.getStorageSync("token") || "";
   const baseUrl =
-    (app && app.globalData && app.globalData.apiBaseUrl) || "http://127.0.0.1:8000/api/v1";
+    (app && app.globalData && app.globalData.apiBaseUrl) || getApiBaseUrl();
   const normalizedBaseUrl = String(baseUrl).replace(/\/$/, "");
 
   return new Promise((resolve, reject) => {

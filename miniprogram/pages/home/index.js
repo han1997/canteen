@@ -1,9 +1,10 @@
 const api = require("../../services/api");
 const { CATEGORY_LABEL, MEAL_TYPE_LABEL } = require("../../utils/constants");
 const { formatDateTime, todayString } = require("../../utils/date");
+const { getApiBaseUrl } = require("../../config/env");
 
 const PRIVILEGED_ROLES = ["kitchen", "admin", "super_admin"];
-const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000/api/v1";
+const DEFAULT_API_BASE_URL = getApiBaseUrl();
 const DEFAULT_MEAL_IMAGE_LOCAL = "/assets/default-meal.png";
 const PROFILE_SYNC_INTERVAL = 5 * 60 * 1000;
 const HOME_REFRESH_INTERVAL = 45 * 1000;

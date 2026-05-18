@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+coverage.xml
+
+# Virtual environment (must NOT be copied into the image)
+.venv/
+env/
+
+# Secrets / local config (pass via env vars or compose instead)
+.env
+.env.*
+!.env.example
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Generated artifacts
+exports/
+logs/
+*.log
+*.tmp
+*.temp
+
+# Docs / SQL not needed at runtime (ORM creates tables on startup)
+docs/
+sql/
+
+# VCS
+.git/
+.gitignore
