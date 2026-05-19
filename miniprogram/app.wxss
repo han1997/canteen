@@ -44,6 +44,14 @@ page {
   box-shadow: 0 8rpx 20rpx rgba(12, 43, 78, 0.26);
 }
 
+.primary-btn[disabled] {
+  background: #6a7a90;
+  color: #ffffff;
+  box-shadow: none;
+  opacity: 1;
+  font-weight: 600;
+}
+
 .warn-btn {
   background: linear-gradient(135deg, #9d2d1f 0%, #d2452e 100%);
   color: #ffffff;
@@ -51,6 +59,13 @@ page {
   font-size: 28rpx;
   font-weight: 600;
   box-shadow: 0 8rpx 18rpx rgba(163, 54, 35, 0.22);
+}
+
+.warn-btn[disabled] {
+  background: #6a7a90;
+  color: #ffffff;
+  box-shadow: none;
+  opacity: 1;
 }
 
 .inline {

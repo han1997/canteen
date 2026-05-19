@@ -2,9 +2,10 @@
 const FALLBACK_ENV = "release";
 
 const ENV_API_BASE_URL_MAP = {
-  develop: "http://127.0.0.1:8000/api/v1",
-  trial: "https://ct.128791.xyz:2096/api/v1",
-  release: "https://ct.128791.xyz:2096/api/v1"
+  develop: "https://hhycanteen.iepose.cn/api/v1",
+  //develop: "http://127.0.0.1:8000/api/v1",
+  trial: "https://hhycanteen.iepose.cn/api/v1",
+  release: "https://hhycanteen.iepose.cn/api/v1"
 };
 
 function normalizeEnv(value) {

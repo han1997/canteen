@@ -12,7 +12,7 @@ from app.core.security import (
     verify_password,
 )
 from app.db.session import get_db
-from app.models import Department, RoleEnum, User, UserStatusEnum
+from app.models import RoleEnum, User, UserStatusEnum
 from app.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
@@ -26,25 +26,7 @@ from app.services.audit_service import write_audit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-
-def _resolve_bind_department(db: Session) -> Department:
-    # Prefer ROOT department if exists.
-    root_dept = db.scalar(select(Department).where(Department.dept_code == "ROOT"))
-    if root_dept:
-        return root_dept
-
-    # Fallback to first active department.
-    active_dept = db.scalar(
-        select(Department).where(Department.is_active.is_(True)).order_by(Department.id.asc())
-    )
-    if active_dept:
-        return active_dept
-
-    # Bootstrap one default department when DB has no department records.
-    dept = Department(dept_code="ROOT", dept_name="机关本部", is_active=True)
-    db.add(dept)
-    db.flush()
-    return dept
+DEFAULT_DEPT_NAME = "祁门县公安局"
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -75,8 +57,6 @@ def login(payload: LoginRequest, request: Request, db: Annotated[Session, Depend
 @router.post("/wechat-bind", response_model=TokenResponse)
 def wechat_bind(payload: WechatBindRequest, request: Request, db: Annotated[Session, Depends(get_db)]):
     # In police intranet deployments, this should be replaced by trusted SSO/openid gateway.
-    dept = _resolve_bind_department(db)
-
     user = db.scalar(select(User).where(User.police_no == payload.police_no))
     if user:
         if user.real_name != payload.real_name:
@@ -88,7 +68,7 @@ def wechat_bind(payload: WechatBindRequest, request: Request, db: Annotated[Sess
         user = User(
             police_no=payload.police_no,
             real_name=payload.real_name,
-            dept_id=dept.id,
+            dept_name=DEFAULT_DEPT_NAME,
             mobile=payload.mobile,
             wechat_openid=f"mock_openid_{payload.wechat_code[-8:]}",
             role=RoleEnum.OFFICER,

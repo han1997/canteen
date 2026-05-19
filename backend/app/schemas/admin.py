@@ -4,7 +4,7 @@
 class AdminUserCreateRequest(BaseModel):
     police_no: str = Field(min_length=4, max_length=32)
     real_name: str = Field(min_length=2, max_length=64)
-    dept_id: int
+    dept_name: str = Field(default="祁门县公安局", max_length=128)
     role: str = Field(pattern="^(officer|kitchen|admin|super_admin)$")
     mobile: str | None = Field(default=None, max_length=20)
     init_password: str = Field(min_length=6, max_length=64)
@@ -22,7 +22,7 @@ class AdminUserOut(BaseModel):
     id: int
     police_no: str
     real_name: str
-    dept_id: int
+    dept_name: str
     role: str
     status: str
 

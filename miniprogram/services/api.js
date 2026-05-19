@@ -193,6 +193,31 @@ function uploadAdminMealImage(filePath) {
   });
 }
 
+function downloadExportFile(jobNo) {
+  const app = getApp();
+  const token = (app && app.globalData && app.globalData.token) || wx.getStorageSync("token") || "";
+  const baseUrl =
+    (app && app.globalData && app.globalData.apiBaseUrl) || getApiBaseUrl();
+  const normalizedBaseUrl = String(baseUrl).replace(/\/$/, "");
+
+  return new Promise((resolve, reject) => {
+    wx.downloadFile({
+      url: `${normalizedBaseUrl}/stats/export/${encodeURIComponent(jobNo)}/download`,
+      header: token ? { Authorization: `Bearer ${token}` } : {},
+      success: (res) => {
+        if (res.statusCode >= 200 && res.statusCode < 300 && res.tempFilePath) {
+          resolve(res.tempFilePath);
+          return;
+        }
+        reject(new Error(`下载失败（${res.statusCode}）`));
+      },
+      fail: (err) => {
+        reject(new Error((err && err.errMsg) || "下载失败"));
+      }
+    });
+  });
+}
+
 function getStatsSummary(fromDate, toDate) {
   return request({
     url: "/stats/summary",
@@ -250,5 +275,6 @@ module.exports = {
   getStatsSummary,
   getBreakfastItemStats,
   exportStats,
-  getExportJob
+  getExportJob,
+  downloadExportFile
 };

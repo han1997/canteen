@@ -1,5 +1,10 @@
-﻿-- MySQL 8.0 schema for canteen mini-program (公安内网场景)
--- Recommended: create a dedicated DB user with least privileges.
+-- Canteen mini-program — MySQL 8.0 单文件部署脚本
+-- 新部署只需导入本文件，包含建库、建表、默认超管账号。
+--
+-- 默认超管：警号 900001 / 密码 123456（pbkdf2_sha256 哈希）
+-- 部门字段：直接保存名称，默认 “祁门县公安局”。
+--
+-- 字符集统一 utf8mb4，所有外键引用收敛到 users / meal_slots / meal_packages / orders。
 
 CREATE DATABASE IF NOT EXISTS canteen_db
   DEFAULT CHARACTER SET utf8mb4
@@ -7,22 +12,14 @@ CREATE DATABASE IF NOT EXISTS canteen_db
 
 USE canteen_db;
 
-CREATE TABLE IF NOT EXISTS departments (
-  id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  dept_code VARCHAR(64) NOT NULL UNIQUE,
-  dept_name VARCHAR(128) NOT NULL,
-  parent_id BIGINT NULL,
-  is_active TINYINT(1) NOT NULL DEFAULT 1,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_departments_parent_id (parent_id)
-) ENGINE=InnoDB;
-
+-- ===========================================================
+-- users
+-- ===========================================================
 CREATE TABLE IF NOT EXISTS users (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   police_no VARCHAR(32) NOT NULL UNIQUE,
   real_name VARCHAR(64) NOT NULL,
-  dept_id BIGINT NOT NULL,
+  dept_name VARCHAR(128) NOT NULL DEFAULT '祁门县公安局',
   mobile VARCHAR(20) NULL,
   wechat_openid VARCHAR(64) NULL UNIQUE,
   role ENUM('officer','kitchen','admin','super_admin') NOT NULL DEFAULT 'officer',
@@ -31,11 +28,12 @@ CREATE TABLE IF NOT EXISTS users (
   last_login_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_users_dept_id FOREIGN KEY (dept_id) REFERENCES departments(id),
-  INDEX idx_users_dept_id (dept_id),
   INDEX idx_users_role_status (role, status)
 ) ENGINE=InnoDB;
 
+-- ===========================================================
+-- meal_slots
+-- ===========================================================
 CREATE TABLE IF NOT EXISTS meal_slots (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   meal_date DATE NOT NULL,
@@ -49,6 +47,9 @@ CREATE TABLE IF NOT EXISTS meal_slots (
   CONSTRAINT fk_meal_slots_created_by FOREIGN KEY (created_by) REFERENCES users(id)
 ) ENGINE=InnoDB;
 
+-- ===========================================================
+-- meal_packages
+-- ===========================================================
 CREATE TABLE IF NOT EXISTS meal_packages (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   slot_id BIGINT NOT NULL,
@@ -70,6 +71,9 @@ CREATE TABLE IF NOT EXISTS meal_packages (
   INDEX idx_meal_packages_category (meal_category)
 ) ENGINE=InnoDB;
 
+-- ===========================================================
+-- meal_package_items
+-- ===========================================================
 CREATE TABLE IF NOT EXISTS meal_package_items (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   package_id BIGINT NOT NULL,
@@ -84,6 +88,9 @@ CREATE TABLE IF NOT EXISTS meal_package_items (
   INDEX idx_meal_package_items_package_id (package_id)
 ) ENGINE=InnoDB;
 
+-- ===========================================================
+-- orders
+-- ===========================================================
 CREATE TABLE IF NOT EXISTS orders (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   order_no VARCHAR(40) NOT NULL UNIQUE,
@@ -109,6 +116,9 @@ CREATE TABLE IF NOT EXISTS orders (
   INDEX idx_orders_user_status (user_id, status)
 ) ENGINE=InnoDB;
 
+-- ===========================================================
+-- order_items
+-- ===========================================================
 CREATE TABLE IF NOT EXISTS order_items (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   order_id BIGINT NOT NULL,
@@ -121,6 +131,9 @@ CREATE TABLE IF NOT EXISTS order_items (
   INDEX idx_order_items_order_id (order_id)
 ) ENGINE=InnoDB;
 
+-- ===========================================================
+-- reminder_tasks
+-- ===========================================================
 CREATE TABLE IF NOT EXISTS reminder_tasks (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   task_name VARCHAR(128) NOT NULL,
@@ -137,6 +150,9 @@ CREATE TABLE IF NOT EXISTS reminder_tasks (
   INDEX idx_reminder_tasks_send_at (send_at, status)
 ) ENGINE=InnoDB;
 
+-- ===========================================================
+-- export_jobs
+-- ===========================================================
 CREATE TABLE IF NOT EXISTS export_jobs (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   job_no VARCHAR(40) NOT NULL UNIQUE,
@@ -154,6 +170,9 @@ CREATE TABLE IF NOT EXISTS export_jobs (
   INDEX idx_export_jobs_status_created_at (status, created_at)
 ) ENGINE=InnoDB;
 
+-- ===========================================================
+-- audit_logs
+-- ===========================================================
 CREATE TABLE IF NOT EXISTS audit_logs (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   actor_user_id BIGINT NULL,
@@ -168,15 +187,12 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   INDEX idx_audit_logs_action_created (action, created_at)
 ) ENGINE=InnoDB;
 
--- Seed one top-level department and super admin example
-INSERT INTO departments (dept_code, dept_name)
-SELECT 'ROOT', '机关本部'
-WHERE NOT EXISTS (SELECT 1 FROM departments WHERE dept_code = 'ROOT');
-
--- Example account (replace password hash in production)
-INSERT INTO users (police_no, real_name, dept_id, role, status, password_hash)
-SELECT '000001', '系统管理员', d.id, 'super_admin', 'active', '$2b$12$replace_me'
-FROM departments d
-WHERE d.dept_code = 'ROOT'
-  AND NOT EXISTS (SELECT 1 FROM users WHERE police_no = '000001');
-
+-- ===========================================================
+-- 默认超级管理员
+-- 警号 900001 / 密码 123456（pbkdf2_sha256）
+-- 首次登录后请立即在“修改密码”里更换。
+-- ===========================================================
+INSERT INTO users (police_no, real_name, dept_name, role, status, password_hash)
+SELECT '900001', '超级管理员', '祁门县公安局', 'super_admin', 'active',
+       '$pbkdf2-sha256$29000$kNIag/AeY6z1npMyJiSEEA$9Q9wgrmtxCXO855VxzGA3BscAvqUO82NMNIDeEFaegQ'
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE police_no = '900001');

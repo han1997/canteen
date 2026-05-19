@@ -110,6 +110,11 @@ Page({
   },
 
   async onShow() {
+    // Suppress refresh when returning from system media picker — otherwise the
+    // in-progress draft form (name / price) gets wiped by a server reload.
+    if (this._pickingImage) {
+      return;
+    }
     await this.ensureAccess();
     if (this.data.allowed) {
       await this.loadSlots();
@@ -323,6 +328,7 @@ Page({
   async choosePackageImage(e) {
     const slotIndex = Number(e.currentTarget.dataset.slotIndex);
     const pkgIndex = Number(e.currentTarget.dataset.pkgIndex);
+    this._pickingImage = true;
     try {
       const filePath = await chooseImageFile();
       const compressedPath = await compressImageFile(filePath);
@@ -340,11 +346,13 @@ Page({
       toast(err.message || "上传图片失败");
     } finally {
       wx.hideLoading();
+      this._pickingImage = false;
     }
   },
 
   async chooseDraftImage(e) {
     const slotIndex = Number(e.currentTarget.dataset.slotIndex);
+    this._pickingImage = true;
     try {
       const filePath = await chooseImageFile();
       const compressedPath = await compressImageFile(filePath);
@@ -362,6 +370,7 @@ Page({
       toast(err.message || "上传图片失败");
     } finally {
       wx.hideLoading();
+      this._pickingImage = false;
     }
   },
 

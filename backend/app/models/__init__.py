@@ -1,7 +1,6 @@
 ﻿from app.models.base import Base
 from app.models.entities import (
     AuditLog,
-    Department,
     ExportJob,
     MealCategoryEnum,
     MealPackage,
@@ -19,7 +18,6 @@ from app.models.entities import (
 __all__ = [
     "AuditLog",
     "Base",
-    "Department",
     "ExportJob",
     "MealCategoryEnum",
     "MealPackage",

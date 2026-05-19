@@ -54,23 +54,13 @@ class OrderStatusEnum(str, Enum):
     CANCELLED = "cancelled"
 
 
-class Department(Base, TimestampMixin):
-    __tablename__ = "departments"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    dept_code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    dept_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("departments.id"), nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-
-
 class User(Base, TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     police_no: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
     real_name: Mapped[str] = mapped_column(String(64), nullable=False)
-    dept_id: Mapped[int] = mapped_column(ForeignKey("departments.id"), nullable=False)
+    dept_name: Mapped[str] = mapped_column(String(128), nullable=False, default="祁门县公安局")
     mobile: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     wechat_openid: Mapped[Optional[str]] = mapped_column(String(64), unique=True, nullable=True)
     role: Mapped[RoleEnum] = mapped_column(
@@ -85,8 +75,6 @@ class User(Base, TimestampMixin):
     )
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-
-    department = relationship("Department")
 
 
 class MealSlot(Base, TimestampMixin):

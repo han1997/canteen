@@ -8,7 +8,6 @@ from app.core.config import settings
 from app.core.security import get_password_hash
 from app.db.session import SessionLocal
 from app.models import (
-    Department,
     MealCategoryEnum,
     MealPackage,
     MealPackageItem,
@@ -20,19 +19,11 @@ from app.models import (
 )
 
 
+DEFAULT_DEPT_NAME = "祁门县公安局"
+
+
 def _default_image_url() -> str:
     return settings.default_meal_image_url
-
-
-def _ensure_root_department(db) -> Department:
-    dept = db.scalar(select(Department).where(Department.dept_code == "ROOT"))
-    if dept:
-        return dept
-
-    dept = Department(dept_code="ROOT", dept_name="机关本部", is_active=True)
-    db.add(dept)
-    db.flush()
-    return dept
 
 
 def _ensure_user(
@@ -40,16 +31,16 @@ def _ensure_user(
     *,
     police_no: str,
     real_name: str,
-    dept_id: int,
     role: RoleEnum,
     password: str,
+    dept_name: str = DEFAULT_DEPT_NAME,
 ) -> User:
     user = db.scalar(select(User).where(User.police_no == police_no))
     if not user:
         user = User(
             police_no=police_no,
             real_name=real_name,
-            dept_id=dept_id,
+            dept_name=dept_name,
             role=role,
             status=UserStatusEnum.ACTIVE,
             password_hash=get_password_hash(password),
@@ -284,13 +275,10 @@ def seed_dev_data() -> None:
         return
 
     with SessionLocal() as db:
-        dept = _ensure_root_department(db)
-
         super_admin = _ensure_user(
             db,
             police_no="900001",
             real_name="superadmin",
-            dept_id=dept.id,
             role=RoleEnum.SUPER_ADMIN,
             password="123456",
         )
@@ -298,7 +286,6 @@ def seed_dev_data() -> None:
             db,
             police_no="900002",
             real_name="adminuser",
-            dept_id=dept.id,
             role=RoleEnum.ADMIN,
             password="123456",
         )
@@ -306,7 +293,6 @@ def seed_dev_data() -> None:
             db,
             police_no="900003",
             real_name="kitchenuser",
-            dept_id=dept.id,
             role=RoleEnum.KITCHEN,
             password="123456",
         )
@@ -314,7 +300,6 @@ def seed_dev_data() -> None:
             db,
             police_no="900004",
             real_name="officeruser",
-            dept_id=dept.id,
             role=RoleEnum.OFFICER,
             password="123456",
         )
@@ -358,12 +343,10 @@ def maintain_booking_window() -> None:
     with SessionLocal() as db:
         super_admin = db.scalar(select(User).where(User.role == RoleEnum.SUPER_ADMIN).order_by(User.id.asc()))
         if not super_admin:
-            dept = _ensure_root_department(db)
             super_admin = _ensure_user(
                 db,
                 police_no="900001",
                 real_name="superadmin",
-                dept_id=dept.id,
                 role=RoleEnum.SUPER_ADMIN,
                 password="123456",
             )

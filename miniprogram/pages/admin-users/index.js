@@ -27,7 +27,7 @@ Page({
     roleLabels: ROLE_OPTIONS.map((item) => item.label),
     createPoliceNo: "",
     createRealName: "",
-    createDeptId: "1",
+    createDeptName: "祁门县公安局",
     createMobile: "",
     createRoleIndex: 0,
     createPassword: ""
@@ -108,7 +108,7 @@ Page({
       id: user.id,
       policeNo: user.police_no,
       realName: user.real_name,
-      deptId: user.dept_id,
+      deptName: user.dept_name,
       role: user.role,
       roleLabel: ROLE_LABEL[user.role] || user.role,
       roleIndex: this.roleIndexByValue(user.role),
@@ -135,12 +135,12 @@ Page({
   async submitCreate() {
     const policeNo = this.data.createPoliceNo.trim();
     const realName = this.data.createRealName.trim();
-    const deptId = Number(this.data.createDeptId);
+    const deptName = (this.data.createDeptName || "").trim() || "祁门县公安局";
     const mobile = this.data.createMobile.trim();
     const initPassword = this.data.createPassword;
     const role = ROLE_OPTIONS[this.data.createRoleIndex].value;
 
-    if (!policeNo || !realName || !deptId || !initPassword) {
+    if (!policeNo || !realName || !initPassword) {
       toast("请填写完整用户信息");
       return;
     }
@@ -154,7 +154,7 @@ Page({
       await api.createAdminUser({
         police_no: policeNo,
         real_name: realName,
-        dept_id: deptId,
+        dept_name: deptName,
         role,
         mobile: mobile || null,
         init_password: initPassword
@@ -163,7 +163,7 @@ Page({
       this.setData({
         createPoliceNo: "",
         createRealName: "",
-        createDeptId: "1",
+        createDeptName: "祁门县公安局",
         createMobile: "",
         createRoleIndex: 0,
         createPassword: ""

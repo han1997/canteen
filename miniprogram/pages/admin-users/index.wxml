@@ -43,10 +43,9 @@
       />
       <input
         class="input"
-        placeholder="部门 ID（数字）"
-        type="number"
-        value="{{createDeptId}}"
-        data-field="createDeptId"
+        placeholder="部门名称（默认：祁门县公安局）"
+        value="{{createDeptName}}"
+        data-field="createDeptName"
         bindinput="onCreateInput"
       />
       <input
@@ -84,7 +83,7 @@
           <view class="user-name">{{user.realName}}（{{user.policeNo}}）</view>
           <text class="{{user.statusClass}}">{{user.statusLabel}}</text>
         </view>
-        <view class="muted">部门 ID：{{user.deptId}}</view>
+        <view class="muted">部门：{{user.deptName}}</view>
         <view class="inline action-row">
           <picker
             mode="selector"

@@ -1,0 +1,78 @@
+# Canteen backend stack
+#
+# Usage:
+#   1) Create a .env next to this file with:
+#        JWT_SECRET_KEY=<64+ random chars>
+#        MYSQL_PASSWORD=<canteen user password>
+#        MYSQL_ROOT_PASSWORD=<root password>
+#   2) docker compose pull && docker compose up -d
+#   3) curl http://<host>:8000/healthz   # expect {"status":"ok"}
+#
+# Notes:
+#   - schema.sql auto-loads on first MySQL start. To re-seed, drop the
+#     mysql_data volume: `docker compose down -v`.
+#   - Registry 192.168.10.4:51001 is HTTP — add it to the host's
+#     /etc/docker/daemon.json under "insecure-registries" before pulling.
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: canteen-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: canteen_db
+      MYSQL_USER: canteen
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - canteen
+
+  backend:
+    image: 192.168.10.4:51001/canteen_backend:20260518035155
+    container_name: canteen-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_NAME: Canteen Backend
+      APP_ENV: production
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY in .env}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: 480
+      BOOKING_SEED_DAYS: 14
+      BOOKING_AUTO_OPEN_DAYS: 2
+      DEFAULT_MEAL_IMAGE_URL: /static/default-meal.png
+      DATABASE_URL: mysql+pymysql://canteen:${MYSQL_PASSWORD}@db:3306/canteen_db?charset=utf8mb4
+      TZ: Asia/Shanghai
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_uploads:/app/static/uploads
+      - backend_exports:/app/exports
+    networks:
+      - canteen
+
+volumes:
+  mysql_data:
+  backend_uploads:
+  backend_exports:
+
+networks:
+  canteen:
+    driver: bridge

@@ -31,6 +31,12 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 - 字段：`image`（`jpg/png/webp`，最大 `3MB`）
 - 返回：`{"image_url": "/static/uploads/meals/xxx.png"}`
 
+导出文件下载：
+- 列表/详情/创建接口（`POST /api/v1/stats/export`、`GET /api/v1/stats/export/{job_no}`）的返回体新增 `file_name`、`download_url` 字段；当 `status == "done"` 时 `download_url` 形如 `/stats/export/{job_no}/download`。
+- 下载接口：`GET /api/v1/stats/export/{job_no}/download`（需 `kitchen`/`admin`/`super_admin` 角色，携带 `Authorization: Bearer <token>`），通过 `FileResponse` 流式返回 xlsx，附带 `Content-Disposition`。
+- 小程序侧使用 `wx.downloadFile` + `wx.openDocument` 实现"下载/查看"，在手机微信里可通过右上角菜单转发或保存；PC 微信会直接调用系统 Excel/WPS 打开。
+- 上线前需在微信公众平台把后端域名加入 **downloadFile 合法域名**。
+
 开发环境自动初始化（`APP_ENV != production`）：
 - 启动时会自动补齐未来 `BOOKING_SEED_DAYS` 天餐次（早/中/晚）与测试菜品。
 - 默认仅今明两天开启订餐（`BOOKING_AUTO_OPEN_DAYS=2`），其他日期默认关闭，需食堂人员/管理员在“菜品管理”手动开启。
@@ -68,3 +74,70 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 - JWT 密钥存放到专网密钥管理系统，不写死在代码里。
 - 导出文件目录设置定期清理任务，防止磁盘堆积。
 - 如需短信/微信提醒，将 `reminder_tasks` 对接内部消息网关定时任务。
+
+## 7. 镜像构建与发布（内网 CI）
+镜像由一个独立的"工具人"容器（`git-docker-builder`）构建并推送到内网仓库 `192.168.10.4:51001`。
+通过挂载宿主机 `/var/run/docker.sock` 复用宿主机 Docker 守护进程，无需 `--privileged`，
+也不需要 DinD，速度快且可命中宿主机镜像缓存。
+
+### 7.1 工具镜像 `git-docker-builder`
+Alpine + git + docker-cli + jq，仅用作"跑脚本的壳"。
+
+`builder/Dockerfile`：
+```dockerfile
+FROM alpine:3.18
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+RUN apk add --no-cache bash git docker-cli openssh-client jq
+WORKDIR /workspace
+CMD ["/bin/bash"]
+```
+构建（一次性）：
+```bash
+docker build -t git-docker-builder:v1 .
+```
+
+### 7.2 构建并推送脚本 `build-and-push.sh`
+放在项目根目录（被挂载为 `/workspace`），由工具镜像执行。时间戳即镜像 TAG：
+```bash
+#!/bin/bash
+set -e
+REGISTRY="192.168.10.4:51001"
+IMAGE_NAME="canteen_backend"
+TAG=$(date +%Y%m%d%H%M%S)   # 例：20260518035155
+
+docker build -t ${REGISTRY}/${IMAGE_NAME}:${TAG} ./backend
+docker tag  ${REGISTRY}/${IMAGE_NAME}:${TAG} ${REGISTRY}/${IMAGE_NAME}:latest
+
+docker push ${REGISTRY}/${IMAGE_NAME}:${TAG}
+docker push ${REGISTRY}/${IMAGE_NAME}:latest
+
+echo "已发布镜像: ${REGISTRY}/${IMAGE_NAME}:${TAG}"
+```
+
+### 7.3 实际执行命令
+项目代码放在宿主机 `/home/hhy/docker_build`，目录里含 `backend/`、`build-and-push.sh`：
+```bash
+sudo docker run --rm \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /home/hhy/docker_build:/workspace \
+  -e http_proxy="http://192.168.10.48:7890" \
+  -e https_proxy="http://192.168.10.48:7890" \
+  -e no_proxy="localhost,127.0.0.1,192.168.0.0/16,local.com" \
+  git-docker-builder:v1 \
+  /bin/bash ./build-and-push.sh
+```
+
+### 7.4 避坑提示
+- **内网仓库走 HTTP**：宿主机 `/etc/docker/daemon.json` 需把 `192.168.10.4:51001` 加入 `insecure-registries`，重启 docker 后生效。
+- **代理只用于外网依赖**：`http_proxy / https_proxy` 用来拉 `pip` / `apk` 包；推送到内网仓库走 `no_proxy` 直连，所以 `192.168.0.0/16` 必须在 `no_proxy` 里，否则 push 会被代理拦截。
+- **登录凭据复用**：仓库需登录时，宿主机先 `docker login`，工具容器追加 `-v ~/.docker/config.json:/root/.docker/config.json` 即可免重复登录。
+- **Git SSH 密钥**：若脚本里走 SSH `git clone`，追加 `-v ~/.ssh:/root/.ssh`。
+- **时区一致**：TAG 由 `date` 生成，建议追加 `-v /etc/localtime:/etc/localtime:ro`，避免容器时区与宿主机错位导致 TAG 跳变。
+- **`sudo` 是必要的**：因为要写 `/var/run/docker.sock`；如已将用户加入 `docker` 组可去掉。
+
+### 7.5 部署
+推送完成后，部署端通过仓库根目录的 `docker-compose.yml` 拉取并启动：
+```bash
+docker compose pull && docker compose up -d
+```
+镜像 TAG 升级时更新 `docker-compose.yml` 里 `backend.image` 的 TAG，或在 compose 文件中用 `${BACKEND_TAG}` 占位。

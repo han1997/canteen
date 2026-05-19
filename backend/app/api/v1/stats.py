@@ -1,7 +1,9 @@
 from datetime import date
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import FileResponse
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
@@ -27,6 +29,19 @@ router = APIRouter(
     tags=["stats"],
     dependencies=[Depends(role_required(RoleEnum.KITCHEN, RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN))],
 )
+
+
+def _serialize_export_job(job: ExportJob) -> ExportJobOut:
+    file_name = Path(job.file_path).name if job.file_path else None
+    download_url = (
+        f"/stats/export/{job.job_no}/download"
+        if job.status == "done" and job.file_path
+        else None
+    )
+    data = ExportJobOut.model_validate(job).model_dump()
+    data["file_name"] = file_name
+    data["download_url"] = download_url
+    return ExportJobOut(**data)
 
 
 def _query_lunch_dinner_package_stats(
@@ -177,7 +192,7 @@ def export_data(
     )
     db.commit()
     db.refresh(job)
-    return job
+    return _serialize_export_job(job)
 
 
 @router.get("/export/{job_no}", response_model=ExportJobOut)
@@ -191,4 +206,29 @@ def export_job_detail(
     job = db.scalar(stmt)
     if not job:
         raise HTTPException(status_code=404, detail="导出任务不存在")
-    return job
+    return _serialize_export_job(job)
+
+
+@router.get("/export/{job_no}/download")
+def export_job_download(
+    job_no: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    _ = current_user
+    stmt = select(ExportJob).where(ExportJob.job_no == job_no)
+    job = db.scalar(stmt)
+    if not job:
+        raise HTTPException(status_code=404, detail="导出任务不存在")
+    if job.status != "done" or not job.file_path:
+        raise HTTPException(status_code=400, detail="导出任务尚未完成")
+
+    file_path = Path(job.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="导出文件不存在或已被清理")
+
+    return FileResponse(
+        path=str(file_path),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=file_path.name,
+    )

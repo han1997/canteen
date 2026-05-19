@@ -8,7 +8,7 @@
     <view class="card hero-card">
       <view class="space-between hero-head">
         <view>
-          <view class="section-title">菜品中心</view>
+          <view class="section-title">菜品管理</view>
           <view class="muted helper-text">上传图片自动压缩，建议使用 4:3 横图</view>
         </view>
         <button class="subtle-btn ghost-btn" size="mini" bindtap="logout">退出登录</button>

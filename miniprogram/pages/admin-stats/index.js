@@ -89,7 +89,8 @@ Page({
     mealTypeIndex: 0,
     mealCategoryIndex: 0,
     exportJob: null,
-    exporting: false
+    exporting: false,
+    downloading: false
   },
 
   onLoad() {
@@ -347,6 +348,40 @@ Page({
       toast("已刷新", "success");
     } catch (err) {
       toast(err.message || "刷新失败");
+    }
+  },
+
+  async downloadExportFile() {
+    const job = this.data.exportJob;
+    if (!job || !job.job_no) {
+      toast("暂无导出任务");
+      return;
+    }
+    if (job.status !== "done") {
+      toast("任务尚未完成");
+      return;
+    }
+    if (this.data.downloading) {
+      return;
+    }
+    this.setData({ downloading: true });
+    wx.showLoading({ title: "下载中...", mask: true });
+    try {
+      const tempFilePath = await api.downloadExportFile(job.job_no);
+      wx.hideLoading();
+      wx.openDocument({
+        filePath: tempFilePath,
+        fileType: "xlsx",
+        showMenu: true,
+        fail: (err) => {
+          toast((err && err.errMsg) || "无法打开文件");
+        }
+      });
+    } catch (err) {
+      wx.hideLoading();
+      toast(err.message || "下载失败");
+    } finally {
+      this.setData({ downloading: false });
     }
   },
 

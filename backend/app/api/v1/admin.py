@@ -210,7 +210,7 @@ def create_user(
     user = User(
         police_no=payload.police_no,
         real_name=payload.real_name,
-        dept_id=payload.dept_id,
+        dept_name=payload.dept_name,
         mobile=payload.mobile,
         role=RoleEnum(payload.role),
         status=UserStatusEnum.ACTIVE,

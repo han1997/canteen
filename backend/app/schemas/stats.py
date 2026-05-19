@@ -41,6 +41,8 @@ class ExportJobOut(BaseModel):
     meal_category: str
     status: str
     file_path: str | None
+    file_name: str | None = None
+    download_url: str | None = None
     error_msg: str | None
     created_at: datetime
     updated_at: datetime

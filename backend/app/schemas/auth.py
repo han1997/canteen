@@ -29,7 +29,7 @@ class UserProfile(BaseModel):
     id: int
     police_no: str
     real_name: str
-    dept_id: int
+    dept_name: str
     role: str
     status: str
     last_login_at: datetime | None
