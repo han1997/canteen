@@ -1,5 +1,6 @@
 const api = require("../../services/api");
 const { ROLE_LABEL } = require("../../utils/constants");
+const { withPullDownRefresh } = require("../../utils/pull-refresh");
 
 const ADMIN_ROLES = ["admin", "super_admin"];
 const ROLE_OPTIONS = [
@@ -39,6 +40,13 @@ Page({
       await this.loadUsers();
     }
   },
+
+  onPullDownRefresh: withPullDownRefresh(async function () {
+    await this.ensureAccess();
+    if (this.data.allowed) {
+      await this.loadUsers();
+    }
+  }),
 
   async ensureAccess() {
     const app = getApp();

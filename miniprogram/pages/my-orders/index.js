@@ -1,6 +1,7 @@
 const api = require("../../services/api");
 const { MEAL_TYPE_LABEL } = require("../../utils/constants");
 const { addDays, formatDateTime, listDateStrings, todayString } = require("../../utils/date");
+const { withPullDownRefresh } = require("../../utils/pull-refresh");
 
 const STATUS_LABEL = {
   booked: "已预约",
@@ -46,10 +47,7 @@ Page({
     await this.loadOrders();
   },
 
-  async onPullDownRefresh() {
-    await this.loadOrders();
-    wx.stopPullDownRefresh();
-  },
+  onPullDownRefresh: withPullDownRefresh("loadOrders"),
 
   async ensureAuth() {
     const app = getApp();

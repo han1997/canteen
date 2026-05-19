@@ -1,5 +1,6 @@
 const api = require("../../services/api");
 const { todayString } = require("../../utils/date");
+const { withPullDownRefresh } = require("../../utils/pull-refresh");
 const { getApiBaseUrl } = require("../../config/env");
 
 const MANAGE_ROLES = ["kitchen", "admin", "super_admin"];
@@ -120,6 +121,16 @@ Page({
       await this.loadSlots();
     }
   },
+
+  onPullDownRefresh: withPullDownRefresh(
+    async function () {
+      await this.ensureAccess();
+      if (this.data.allowed) {
+        await this.loadSlots();
+      }
+    },
+    { guard() { return !!this._pickingImage; } }
+  ),
 
   async ensureAccess() {
     const app = getApp();

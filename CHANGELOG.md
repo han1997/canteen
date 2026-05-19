@@ -4,6 +4,30 @@
 
 ## 2026-05-19
 
+### 重构：下拉刷新逻辑抽到 `utils/pull-refresh.js`
+**动机**：上一条新增下拉刷新时，4 个页面分别写了 `try/finally + wx.stopPullDownRefresh()` 样板，且部分页面还要处理 `guard`（如 `admin-meals` 的 `_pickingImage`）。重复且容易遗漏 `stopPullDownRefresh` 导致 loading 卡死。
+
+**改动**：
+- 新增 `miniprogram/utils/pull-refresh.js`，导出 `withPullDownRefresh(refresh, { guard })`：
+  - `refresh` 可以是 Page 上的方法名（字符串）或函数（绑定到 Page `this`）。
+  - 可选 `guard()` 返回真值时跳过本次刷新（例如选图过程中不刷新）。
+  - 内部统一 `try/finally`，保证异常路径也会 `wx.stopPullDownRefresh()`。
+- 4 个页面改造为声明式用法：
+  - `home`：`withPullDownRefresh(function () { return this.initAndLoad({ force: true, silent: false }); })`
+  - `my-orders`：`withPullDownRefresh("loadOrders")`
+  - `admin-meals`：传函数 + `guard() { return !!this._pickingImage; }`
+  - `admin-users`：传函数（含 `ensureAccess` + `loadUsers`）
+- 之前对 home/my-orders 的"已有 handler 维持原状"也一并统一替换，便于后续维护。
+
+### 新增：4 个数据页支持下拉刷新
+**问题**：`home`、`my-orders` 两页虽然写了 `onPullDownRefresh` handler，但对应 JSON 配置里没开 `enablePullDownRefresh`，所以下拉手势根本不会触发；`admin-meals`、`admin-users` 两页连 handler 都没有。
+
+**改动**：
+- `miniprogram/pages/{home,my-orders,admin-meals,admin-users}/index.json`：均加上 `"enablePullDownRefresh": true` 与 `"backgroundTextStyle": "dark"`（深色三点指示器，深底背景下更清晰）。
+- `miniprogram/pages/admin-meals/index.js`：新增 `onPullDownRefresh`，复用 `_pickingImage` 守卫避免回到页面时清掉草稿表单；`try/finally` 包住，异常也能停掉下拉 loading。
+- `miniprogram/pages/admin-users/index.js`：同上模式，新增 `onPullDownRefresh`。
+- `home`、`my-orders` 两页已有的 handler 维持原状（逻辑可用，错误均在内部捕获）。
+
 ### 修复：生产环境 slot 自动初始化未执行 + 加固
 **问题**：上一次"项目初始化默认餐次保留"的改动里，`seed_dev_data()`、`maintain_booking_window()` 都在第一行 `if app_env in {"prod","production"}: return`，导致 `APP_ENV=production` 时 14 天 × 3 餐次的 slot 完全没创建，订餐页和菜品管理页都显示"暂无可订餐时段/请先点击发布"。
 

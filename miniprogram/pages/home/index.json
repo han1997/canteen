@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "订餐"
+  "navigationBarTitleText": "订餐",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
 }

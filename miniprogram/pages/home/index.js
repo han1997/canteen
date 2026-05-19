@@ -1,6 +1,7 @@
 const api = require("../../services/api");
 const { CATEGORY_LABEL, MEAL_TYPE_LABEL } = require("../../utils/constants");
 const { formatDateTime, todayString } = require("../../utils/date");
+const { withPullDownRefresh } = require("../../utils/pull-refresh");
 const { getApiBaseUrl } = require("../../config/env");
 
 const PRIVILEGED_ROLES = ["kitchen", "admin", "super_admin"];
@@ -85,10 +86,9 @@ Page({
     this.initAndLoad({ force: false, silent: true });
   },
 
-  async onPullDownRefresh() {
-    await this.initAndLoad({ force: true, silent: false });
-    wx.stopPullDownRefresh();
-  },
+  onPullDownRefresh: withPullDownRefresh(function () {
+    return this.initAndLoad({ force: true, silent: false });
+  }),
 
   async initAndLoad(options = {}) {
     const force = !!options.force;
