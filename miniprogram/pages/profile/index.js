@@ -27,7 +27,15 @@ Page({
   },
 
   onShow() {
+    this.syncTabBar();
     this.ensureAuth(false);
+  },
+
+  syncTabBar() {
+    const tabBar = typeof this.getTabBar === "function" ? this.getTabBar() : null;
+    if (tabBar && typeof tabBar.refresh === "function") {
+      tabBar.refresh("/pages/profile/index");
+    }
   },
 
   async ensureAuth(force = false) {
@@ -85,6 +93,7 @@ Page({
       showRole,
       canManage
     });
+    this.syncTabBar();
   },
 
   onPwdInput(e) {

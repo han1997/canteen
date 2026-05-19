@@ -83,7 +83,15 @@ Page({
   },
 
   onShow() {
+    this.syncTabBar();
     this.initAndLoad({ force: false, silent: true });
+  },
+
+  syncTabBar() {
+    const tabBar = typeof this.getTabBar === "function" ? this.getTabBar() : null;
+    if (tabBar && typeof tabBar.refresh === "function") {
+      tabBar.refresh("/pages/home/index");
+    }
   },
 
   onPullDownRefresh: withPullDownRefresh(function () {
@@ -141,6 +149,7 @@ Page({
       profile,
       canManage
     });
+    this.syncTabBar();
   },
 
   async loadData(options = {}) {

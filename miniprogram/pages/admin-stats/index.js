@@ -101,11 +101,19 @@ Page({
   },
 
   onShow() {
+    this.syncTabBar();
     this.ensureAccess(false).then(() => {
       if (this.data.allowed) {
         this.loadAll({ force: false, silent: true });
       }
     });
+  },
+
+  syncTabBar() {
+    const tabBar = typeof this.getTabBar === "function" ? this.getTabBar() : null;
+    if (tabBar && typeof tabBar.refresh === "function") {
+      tabBar.refresh("/pages/admin-stats/index");
+    }
   },
 
   async ensureAccess(force = false) {
@@ -155,6 +163,7 @@ Page({
       isAdmin,
       roleLabel
     });
+    this.syncTabBar();
   },
 
   onDateChange(e) {

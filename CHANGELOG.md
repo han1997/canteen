@@ -4,6 +4,18 @@
 
 ## 2026-05-19
 
+### 新增：tabBar 按角色隐藏 — 普通民警不再看到"管理"入口
+**动机**：普通民警（officer）没有管理权限，进入"管理"tab 后只看到一句"无权限"，体验差。
+
+**改动**：
+- `miniprogram/app.json`：tabBar 切到 `"custom": true`，由自定义组件接管渲染（`list` 仍保留供 `switchTab` 校验路由）。
+- 新增 `miniprogram/custom-tab-bar/`（`index.{js,wxml,wxss,json}`）：组件按角色过滤要展示的 tab，"管理"仅 `kitchen/admin/super_admin` 可见；点击调用 `wx.switchTab`。
+- `miniprogram/pages/{home,profile,admin-stats}/index.js`：`onShow` 中调用 `this.getTabBar()?.refresh(path)` 同步选中态；在 profile 同步完成后再触发一次，确保角色变化（如新登录、API 返回新角色）后 tabBar 立即更新。
+
+**注意**：
+- admin-meals / admin-users 不在 tabBar 中（管理中心二级页面），仍由各自页面的 `ensureAccess` 守卫，officer 通过深链进入会看到"无权限"。
+- 角色升降需要刷新页面或重新切换 tab 才会体现到 tabBar；如果业务需要后台变更后立即生效，可在 profile sync 成功后再触发一次 `syncTabBar`（已在 3 个 tab 页内布点）。
+
 ### 重构：下拉刷新逻辑抽到 `utils/pull-refresh.js`
 **动机**：上一条新增下拉刷新时，4 个页面分别写了 `try/finally + wx.stopPullDownRefresh()` 样板，且部分页面还要处理 `guard`（如 `admin-meals` 的 `_pickingImage`）。重复且容易遗漏 `stopPullDownRefresh` 导致 loading 卡死。
 
