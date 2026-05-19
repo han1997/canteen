@@ -42,6 +42,7 @@ services:
 
   backend:
     image: 192.168.10.4:51001/canteen_backend:20260518035155
+    user: "1000:1000"
     container_name: canteen-backend
     restart: unless-stopped
     depends_on:
