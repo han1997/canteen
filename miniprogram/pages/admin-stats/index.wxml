@@ -12,6 +12,7 @@
           <view class="muted">当前角色：{{roleLabel}}</view>
         </view>
         <view class="inline">
+          <button class="subtle-btn" size="mini" bindtap="goHome">返回首页</button>
           <button wx:if="{{isAdmin}}" class="subtle-btn" size="mini" bindtap="goAdminUsers">用户管理</button>
           <button class="subtle-btn" size="mini" bindtap="goMealManage">菜品管理</button>
           <button class="subtle-btn" size="mini" bindtap="logout">退出登录</button>

@@ -14,6 +14,7 @@ const STATUS_CLASS = {
   verified: "status-tag status-verified",
   cancelled: "status-tag status-cancelled"
 };
+const STATUS_CLASS_UNKNOWN = "status-tag status-unknown";
 
 function toast(title, icon) {
   wx.showToast({
@@ -124,7 +125,7 @@ Page({
         slotLabel: slotMap[order.slot_id] || `时段#${order.slot_id}`,
         status: order.status,
         statusLabel: STATUS_LABEL[order.status] || order.status,
-        statusClass: STATUS_CLASS[order.status] || STATUS_CLASS.booked,
+        statusClass: STATUS_CLASS[order.status] || STATUS_CLASS_UNKNOWN,
         bookedAtText: formatDateTime(order.booked_at),
         verifiedAtText: formatDateTime(order.verified_at),
         items: order.items || [],

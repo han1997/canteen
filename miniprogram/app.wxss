@@ -122,6 +122,11 @@ page {
   background: #ffedd5;
 }
 
+.status-unknown {
+  color: #475569;
+  background: #e2e8f0;
+}
+
 .empty-text {
   text-align: center;
   color: #708097;

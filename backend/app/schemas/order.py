@@ -29,8 +29,8 @@ class OrderOut(BaseModel):
     slot_id: int
     package_id: int
     meal_category: str
-    meal_type: str | None = None
-    meal_date: date | None = None
+    meal_type: str
+    meal_date: date
     status: str
     booked_at: datetime
     verified_at: datetime | None

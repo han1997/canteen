@@ -17,7 +17,14 @@
       "Bash(.venv/Scripts/python.exe -c \"import sys; sys.path.insert\\(0,'.'\\); from app.main import app; print\\('app import OK:', app.title\\); print\\('routes:', [r.path for r in app.routes][:5]\\)\")",
       "Bash(.venv/Scripts/python.exe -c ' *)",
       "Bash(gh pr *)",
-      "Bash(where gh *)"
+      "Bash(where gh *)",
+      "Bash(command -v gh)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('backend/app/api/v1/orders.py'\\).read\\(\\)\\); ast.parse\\(open\\('backend/app/schemas/order.py'\\).read\\(\\)\\); print\\('py ok'\\)\")",
+      "Bash(node --check miniprogram/pages/change-password/index.js)",
+      "Bash(node --check miniprogram/pages/profile/index.js)",
+      "Bash(node --check miniprogram/pages/my-orders/index.js)",
+      "Bash(node --check miniprogram/pages/admin-stats/index.js)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('backend/app/api/v1/orders.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('backend/app/schemas/order.py', encoding='utf-8'\\).read\\(\\)\\); print\\('py ok'\\)\")"
     ]
   }
 }

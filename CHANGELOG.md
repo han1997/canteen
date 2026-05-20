@@ -4,6 +4,21 @@
 
 ## 2026-05-20
 
+### 修复：代码评审打回的 5 处小问题
+**动机**：上面"移除 tabBar / 个人中心改造"两条上线前的自审，发现 5 处一致性/可读性瑕疵，集中修掉。
+
+**改动**：
+- `backend/app/api/v1/orders.py`：`_to_order_out` 中 `meal_type` 去掉 `hasattr` 防御与 `if slot is not None` 空判，直接 `slot.meal_type.value` / `slot.meal_date`，和同函数 `meal_category.value` 风格一致；`Order.slot` 为非空外键且调用方都已 `joinedload(Order.slot)`，no defensive checks beyond boundaries。
+- `backend/app/schemas/order.py`：`OrderOut.meal_type` / `meal_date` 由 `Optional` 改为 required（`str` / `date`），契约与实现一致。前端兼容性：字段为新增，旧客户端不读，无影响。
+- `miniprogram/pages/admin-stats/{index.wxml,index.js}`：顶部 action 行新增「返回首页」按钮，`goHome` 走 `wx.reLaunch('/pages/home/index')`，清栈到 home（管理员在 home → profile → admin-stats 多层栈时也能一步到位）。
+- `miniprogram/pages/change-password/index.js`：成功后自动返回的 600ms 抽成 `SUCCESS_BACK_DELAY_MS` 具名常量，并注释说明"等 toast 显示完再退回"。
+- `miniprogram/app.wxss`：新增 `.status-unknown`（中性灰：`#475569` 文字 / `#e2e8f0` 背景），用于未知订单状态的安全 fallback。
+- `miniprogram/pages/profile/index.js`、`miniprogram/pages/my-orders/index.js`：`STATUS_CLASS[order.status]` fallback 由 `STATUS_CLASS.booked`（蓝色"已预约"，会误导）改为新增的 `STATUS_CLASS_UNKNOWN`（中性灰），未知状态视觉上不再伪装成已预约。
+- `miniprogram/pages/profile/index.wxss`：`.recent-order-row` 边线规则改用相邻兄弟选择器 `.recent-order-row + .recent-order-row { border-top }`，去掉对 `:first-of-type`（隐式依赖兄弟元素类型）的依赖；插入/移除"加载中..."等兄弟节点不会再影响第一条边线显隐。
+
+**注意**：
+- `OrderOut` schema 字段由 Optional 收紧为 required 是契约层面的"破坏性"变更，但前提是后端总会传非空（已确认）。若未来引入不带 `slot` 的 Order 来源，pydantic 校验会直接报错——这是有意为之，迫使调用方修自己的 joinedload。
+
 ### 调整：移除底部 tabBar，跳转改走页面内入口
 **动机**：home/profile 已经在自身页面内布好了「个人」「管理」入口按钮，底部那条「订餐 / 我的 / 管理」的 tab 完全重复，占屏且冗余。
 

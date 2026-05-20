@@ -33,12 +33,6 @@ def _to_order_out(order: Order) -> OrderOut:
         )
 
     slot = order.slot
-    meal_type = None
-    meal_date = None
-    if slot is not None:
-        meal_type = slot.meal_type.value if hasattr(slot.meal_type, "value") else str(slot.meal_type)
-        meal_date = slot.meal_date
-
     return OrderOut(
         id=order.id,
         order_no=order.order_no,
@@ -46,8 +40,8 @@ def _to_order_out(order: Order) -> OrderOut:
         slot_id=order.slot_id,
         package_id=order.package_id,
         meal_category=order.meal_category.value,
-        meal_type=meal_type,
-        meal_date=meal_date,
+        meal_type=slot.meal_type.value,
+        meal_date=slot.meal_date,
         status=order.status.value,
         booked_at=order.booked_at,
         verified_at=order.verified_at,

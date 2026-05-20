@@ -1,5 +1,8 @@
 const api = require("../../services/api");
 
+// 等成功 toast 显示完再退回，避免用户没看到反馈就跳走。
+const SUCCESS_BACK_DELAY_MS = 600;
+
 function toast(title, icon) {
   wx.showToast({
     title,
@@ -56,7 +59,7 @@ Page({
       toast("密码修改成功", "success");
       setTimeout(() => {
         wx.navigateBack({ delta: 1 });
-      }, 600);
+      }, SUCCESS_BACK_DELAY_MS);
     } catch (err) {
       toast(err.message || "修改密码失败");
     } finally {

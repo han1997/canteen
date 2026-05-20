@@ -17,11 +17,10 @@
 
 .recent-order-row {
   padding: 16rpx 0;
-  border-top: 1rpx solid #eef1f6;
 }
 
-.recent-order-row:first-of-type {
-  border-top: none;
+.recent-order-row + .recent-order-row {
+  border-top: 1rpx solid #eef1f6;
 }
 
 .recent-order-row .order-no {

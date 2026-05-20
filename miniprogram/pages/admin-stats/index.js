@@ -385,6 +385,12 @@ Page({
     }
   },
 
+  goHome() {
+    wx.reLaunch({
+      url: "/pages/home/index"
+    });
+  },
+
   goAdminUsers() {
     wx.navigateTo({
       url: "/pages/admin-users/index"
