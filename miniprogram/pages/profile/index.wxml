@@ -6,37 +6,29 @@
     <view wx:if="{{showRole}}" class="muted">角色：{{roleLabel}}</view>
     <view class="inline action-row">
       <button class="subtle-btn" size="mini" bindtap="goMyOrders">我的订单</button>
+      <button class="subtle-btn" size="mini" bindtap="goChangePassword">修改密码</button>
       <button wx:if="{{canManage}}" class="subtle-btn" size="mini" bindtap="goManage">管理中心</button>
       <button class="warn-btn" size="mini" bindtap="logout">退出登录</button>
     </view>
   </view>
 
   <view class="card">
-    <view class="section-title">修改密码</view>
-    <input
-      class="input"
-      placeholder="原密码"
-      password="true"
-      value="{{oldPassword}}"
-      data-field="oldPassword"
-      bindinput="onPwdInput"
-    />
-    <input
-      class="input"
-      placeholder="新密码（至少 6 位）"
-      password="true"
-      value="{{newPassword}}"
-      data-field="newPassword"
-      bindinput="onPwdInput"
-    />
-    <input
-      class="input"
-      placeholder="确认新密码"
-      password="true"
-      value="{{confirmPassword}}"
-      data-field="confirmPassword"
-      bindinput="onPwdInput"
-    />
-    <button class="primary-btn" loading="{{changingPassword}}" bindtap="submitChangePassword">确认修改密码</button>
+    <view class="space-between">
+      <view class="section-title">最近订单</view>
+      <view class="link" bindtap="goMyOrders">查看全部</view>
+    </view>
+
+    <view wx:if="{{ordersLoading && !recentOrders.length}}" class="empty-text">加载中...</view>
+    <view wx:elif="{{!recentOrders.length}}" class="empty-text">最近 30 天暂无订单</view>
+
+    <view wx:for="{{recentOrders}}" wx:key="id" wx:for-item="order" class="recent-order-row">
+      <view class="space-between">
+        <view class="order-no">{{order.orderNo}}</view>
+        <text class="{{order.statusClass}}">{{order.statusLabel}}</text>
+      </view>
+      <view class="muted small">时段：{{order.slotLabel}}</view>
+      <view class="muted small">下单：{{order.bookedAtText}}</view>
+      <view class="muted small">{{order.itemsText}}</view>
+    </view>
   </view>
 </view>

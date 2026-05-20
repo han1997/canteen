@@ -2,7 +2,41 @@
 
 本仓库的变更日志，每次代码修改后追加。日期为本地时区（Asia/Shanghai）。
 
+## 2026-05-20
+
+### 调整：移除底部 tabBar，跳转改走页面内入口
+**动机**：home/profile 已经在自身页面内布好了「个人」「管理」入口按钮，底部那条「订餐 / 我的 / 管理」的 tab 完全重复，占屏且冗余。
+
+**改动**：
+- `miniprogram/app.json`：删除整个 `tabBar` 段。
+- 删除 `miniprogram/custom-tab-bar/` 目录（含 `index.{js,wxml,wxss,json}`），自定义 tabBar 组件不再使用。
+- `miniprogram/pages/home/index.js`：移除 `syncTabBar` 函数与 `onShow`、`applyProfile` 里的两处调用；`goProfile` / `goManage` 改用 `wx.navigateTo`。
+- `miniprogram/pages/profile/index.js`：移除 `syncTabBar` 函数与 `onShow`、`_ensureAuthInternal` 里的两处调用；`goManage` 改用 `wx.navigateTo`。
+- `miniprogram/pages/admin-stats/index.js`：移除 `syncTabBar` 函数与 `onShow`、`_ensureAccessInternal` 里的两处调用；没有外部 switchTab。
+- `miniprogram/pages/login/index.js`：3 处登录成功后跳 home 由 `wx.switchTab` 改为 `wx.reLaunch`（home 不再是 tab 页，需 reLaunch 清空登录页栈）。
+
+**注意**：
+- 现在 home → profile / admin-stats、profile → admin-stats 都是 `navigateTo`，左上角自带返回按钮；admin-stats 没有「我的」入口，需返回 home 后再点「个人」（与改动前一致，按钮入口本来就在 home）。
+- 退出登录仍走 `wx.reLaunch` 到 login，与原行为一致。
+- 自定义 tabBar 组件已删除，若历史镜像引用 `custom-tab-bar/*` 资源会 404，需重新构建小程序包发布。
+
 ## 2026-05-19
+
+### 调整：个人中心改为"按钮入口 + 最近订单列表"，修改密码独立成页
+**动机**：原"个人中心"页底部直接铺了一张修改密码表单，使用频率低却占了主屏；同时民警查询订单要进二级页太麻烦。
+
+**改动**：
+- 新增 `miniprogram/pages/change-password/`：把原表单整体迁过来，标题"修改密码"，成功后 600ms 自动 `navigateBack`。
+- `miniprogram/app.json`：注册 `pages/change-password/index`。
+- `miniprogram/pages/profile/`：
+  - WXML 移除密码表单卡片，新增"最近订单"卡片（展示最多 10 笔，标题右侧"查看全部"跳 `my-orders`）。
+  - 顶部操作行新增"修改密码"按钮，与原"我的订单"并列。
+  - JS 删掉所有密码 state 与 `submitChangePassword`；新增 `loadRecentOrders`（查询 `addDays(-29)..today`、客户端截取前 10），加 `goChangePassword`。
+  - `onPullDownRefresh` 用 `utils/pull-refresh.withPullDownRefresh` 包裹，下拉同时刷新 profile 与最近订单。
+  - `index.json` 启用 `enablePullDownRefresh: true`；新增 `.recent-order-row`、`.link` 样式。
+- **后端**：`OrderOut` 增加 `meal_type`、`meal_date` 字段；`_to_order_out` 从 `order.slot` 读取；`POST /orders`、`GET /orders/my` 查询都加 `joinedload(Order.slot)` 避免 N+1。这让最近订单卡片不需要再像 my-orders 页那样按日期拉 slot 字典。
+
+**部署注意**：后端 schema/接口字段为新增向后兼容，但 `OrderOut` 返回结构有变化，需要重建镜像并 bump `docker-compose.yml` 的 `backend.image` tag 才能让小程序拿到新字段；旧镜像跑起来字段为空时，前端会回退显示 `slotLabel = "—"`，不会崩。
 
 ### 新增：tabBar 按角色隐藏 — 普通民警不再看到"管理"入口
 **动机**：普通民警（officer）没有管理权限，进入"管理"tab 后只看到一句"无权限"，体验差。

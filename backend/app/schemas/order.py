@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -29,6 +29,8 @@ class OrderOut(BaseModel):
     slot_id: int
     package_id: int
     meal_category: str
+    meal_type: str | None = None
+    meal_date: date | None = None
     status: str
     booked_at: datetime
     verified_at: datetime | None

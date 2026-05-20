@@ -23,14 +23,14 @@ Page({
       return;
     }
     if (app.globalData.profile) {
-      wx.switchTab({ url: "/pages/home/index" });
+      wx.reLaunch({ url: "/pages/home/index" });
       return;
     }
     try {
       this.setData({ loading: true });
       const profile = await api.getMe();
       app.setAuth(app.globalData.token, profile);
-      wx.switchTab({ url: "/pages/home/index" });
+      wx.reLaunch({ url: "/pages/home/index" });
     } catch (err) {
       app.clearAuth();
     } finally {
@@ -56,7 +56,7 @@ Page({
     app.setAuth(accessToken, null);
     const profile = await api.getMe();
     app.setAuth(accessToken, profile);
-    wx.switchTab({ url: "/pages/home/index" });
+    wx.reLaunch({ url: "/pages/home/index" });
   },
 
   async submitLogin() {

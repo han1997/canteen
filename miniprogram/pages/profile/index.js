@@ -1,11 +1,56 @@
 const api = require("../../services/api");
-const { ROLE_LABEL } = require("../../utils/constants");
+const { ROLE_LABEL, MEAL_TYPE_LABEL } = require("../../utils/constants");
+const { addDays, formatDateTime, todayString } = require("../../utils/date");
+const { withPullDownRefresh } = require("../../utils/pull-refresh");
+
 const PROFILE_SYNC_INTERVAL = 5 * 60 * 1000;
+const RECENT_ORDERS_LIMIT = 10;
+const RECENT_ORDERS_DAYS = 30;
+
+const STATUS_LABEL = {
+  booked: "已预约",
+  verified: "已完成",
+  cancelled: "已取消"
+};
+
+const STATUS_CLASS = {
+  booked: "status-tag status-booked",
+  verified: "status-tag status-verified",
+  cancelled: "status-tag status-cancelled"
+};
 
 function toast(title, icon) {
   wx.showToast({
     title,
     icon: icon || "none"
+  });
+}
+
+function formatItemsText(items) {
+  if (!Array.isArray(items) || !items.length) {
+    return "—";
+  }
+  return items
+    .map((food) => `${food.item_name} ×${Number(food.quantity || 0)}${food.unit || "份"}`)
+    .join("、");
+}
+
+function formatRecentOrders(orders) {
+  return (orders || []).slice(0, RECENT_ORDERS_LIMIT).map((order) => {
+    const mealType = order.meal_type || "";
+    const mealTypeLabel = MEAL_TYPE_LABEL[mealType] || mealType;
+    const mealDate = order.meal_date || "";
+    const slotLabel = [mealDate, mealTypeLabel].filter(Boolean).join(" ") || "—";
+    return {
+      id: order.id,
+      orderNo: order.order_no,
+      status: order.status,
+      statusLabel: STATUS_LABEL[order.status] || order.status,
+      statusClass: STATUS_CLASS[order.status] || STATUS_CLASS.booked,
+      bookedAtText: formatDateTime(order.booked_at),
+      itemsText: formatItemsText(order.items),
+      slotLabel
+    };
   });
 }
 
@@ -15,10 +60,8 @@ Page({
     roleLabel: "",
     showRole: false,
     canManage: false,
-    oldPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-    changingPassword: false
+    recentOrders: [],
+    ordersLoading: false
   },
 
   onLoad() {
@@ -27,15 +70,11 @@ Page({
   },
 
   onShow() {
-    this.syncTabBar();
-    this.ensureAuth(false);
-  },
-
-  syncTabBar() {
-    const tabBar = typeof this.getTabBar === "function" ? this.getTabBar() : null;
-    if (tabBar && typeof tabBar.refresh === "function") {
-      tabBar.refresh("/pages/profile/index");
-    }
+    this.ensureAuth(false).then(() => {
+      if (getApp().globalData.token) {
+        this.loadRecentOrders();
+      }
+    });
   },
 
   async ensureAuth(force = false) {
@@ -93,50 +132,32 @@ Page({
       showRole,
       canManage
     });
-    this.syncTabBar();
   },
 
-  onPwdInput(e) {
-    const field = e.currentTarget.dataset.field;
-    this.setData({
-      [field]: e.detail.value
-    });
-  },
-
-  async submitChangePassword() {
-    const oldPassword = this.data.oldPassword;
-    const newPassword = this.data.newPassword;
-    const confirmPassword = this.data.confirmPassword;
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      toast("请填写完整密码信息");
-      return;
-    }
-    if (newPassword.length < 6) {
-      toast("新密码至少 6 位");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      toast("两次新密码输入不一致");
-      return;
-    }
-
-    this.setData({ changingPassword: true });
+  async loadRecentOrders() {
+    const toDate = todayString();
+    const fromDate = addDays(toDate, -(RECENT_ORDERS_DAYS - 1));
+    this.setData({ ordersLoading: true });
     try {
-      await api.changePassword({
-        old_password: oldPassword,
-        new_password: newPassword
-      });
-      this.setData({
-        oldPassword: "",
-        newPassword: "",
-        confirmPassword: ""
-      });
-      toast("密码修改成功", "success");
+      const orders = await api.getMyOrders(fromDate, toDate);
+      this.setData({ recentOrders: formatRecentOrders(orders) });
     } catch (err) {
-      toast(err.message || "修改密码失败");
+      // Profile page should still render gracefully if order fetch fails.
+      toast(err.message || "加载最近订单失败");
     } finally {
-      this.setData({ changingPassword: false });
+      this.setData({ ordersLoading: false });
     }
+  },
+
+  onPullDownRefresh: withPullDownRefresh(async function () {
+    await this.ensureAuth(true);
+    await this.loadRecentOrders();
+  }),
+
+  goChangePassword() {
+    wx.navigateTo({
+      url: "/pages/change-password/index"
+    });
   },
 
   goMyOrders() {
@@ -146,7 +167,7 @@ Page({
   },
 
   goManage() {
-    wx.switchTab({
+    wx.navigateTo({
       url: "/pages/admin-stats/index"
     });
   },

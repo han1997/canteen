@@ -32,6 +32,13 @@ def _to_order_out(order: Order) -> OrderOut:
             }
         )
 
+    slot = order.slot
+    meal_type = None
+    meal_date = None
+    if slot is not None:
+        meal_type = slot.meal_type.value if hasattr(slot.meal_type, "value") else str(slot.meal_type)
+        meal_date = slot.meal_date
+
     return OrderOut(
         id=order.id,
         order_no=order.order_no,
@@ -39,6 +46,8 @@ def _to_order_out(order: Order) -> OrderOut:
         slot_id=order.slot_id,
         package_id=order.package_id,
         meal_category=order.meal_category.value,
+        meal_type=meal_type,
+        meal_date=meal_date,
         status=order.status.value,
         booked_at=order.booked_at,
         verified_at=order.verified_at,
@@ -77,7 +86,11 @@ def create_order(
     )
     db.commit()
 
-    order = db.scalar(select(Order).where(Order.id == order.id).options(joinedload(Order.items)))
+    order = db.scalar(
+        select(Order)
+        .where(Order.id == order.id)
+        .options(joinedload(Order.items), joinedload(Order.slot))
+    )
     return _to_order_out(order)
 
 
@@ -97,7 +110,7 @@ def my_orders(
             MealSlot.meal_date <= to_date,
             Order.status != OrderStatusEnum.CANCELLED,
         )
-        .options(joinedload(Order.items))
+        .options(joinedload(Order.items), joinedload(Order.slot))
         .order_by(Order.booked_at.desc())
     )
     orders = db.scalars(stmt).unique().all()

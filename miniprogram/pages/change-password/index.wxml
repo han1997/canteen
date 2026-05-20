@@ -1,0 +1,30 @@
+<view class="container">
+  <view class="card">
+    <view class="section-title">修改密码</view>
+    <input
+      class="input"
+      placeholder="原密码"
+      password="true"
+      value="{{oldPassword}}"
+      data-field="oldPassword"
+      bindinput="onInput"
+    />
+    <input
+      class="input"
+      placeholder="新密码（至少 6 位）"
+      password="true"
+      value="{{newPassword}}"
+      data-field="newPassword"
+      bindinput="onInput"
+    />
+    <input
+      class="input"
+      placeholder="确认新密码"
+      password="true"
+      value="{{confirmPassword}}"
+      data-field="confirmPassword"
+      bindinput="onInput"
+    />
+    <button class="primary-btn" loading="{{submitting}}" bindtap="submit">确认修改密码</button>
+  </view>
+</view>

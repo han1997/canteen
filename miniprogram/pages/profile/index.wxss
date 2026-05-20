@@ -1,12 +1,35 @@
 .action-row {
   margin-top: 16rpx;
+  flex-wrap: wrap;
+  gap: 10rpx;
 }
 
 .action-row .subtle-btn,
 .action-row .warn-btn {
-  margin-left: 10rpx;
+  margin-left: 0;
 }
 
-.action-row .subtle-btn:first-child {
-  margin-left: 0;
+.link {
+  color: #0B2A4A;
+  font-size: 26rpx;
+  padding: 6rpx 8rpx;
+}
+
+.recent-order-row {
+  padding: 16rpx 0;
+  border-top: 1rpx solid #eef1f6;
+}
+
+.recent-order-row:first-of-type {
+  border-top: none;
+}
+
+.recent-order-row .order-no {
+  font-weight: 600;
+  font-size: 28rpx;
+}
+
+.recent-order-row .small {
+  font-size: 24rpx;
+  margin-top: 4rpx;
 }
