@@ -9,7 +9,7 @@
       <view class="space-between hero-head">
         <view>
           <view class="section-title">菜品管理</view>
-          <view class="muted helper-text">上传图片自动压缩，建议使用 4:3 横图</view>
+          <view class="muted helper-text">菜品录入一次可重复复用，上传图片会自动压缩（建议 4:3 横图）</view>
         </view>
         <button class="subtle-btn ghost-btn" size="mini" bindtap="logout">退出登录</button>
       </view>
@@ -95,6 +95,15 @@
                 bindtap="choosePackageImage"
               >
                 更换图片
+              </button>
+              <button
+                class="warn-btn action-btn delete-btn"
+                size="mini"
+                data-slot-index="{{slotIndex}}"
+                data-pkg-index="{{pkgIndex}}"
+                bindtap="deletePackage"
+              >
+                删除菜品
               </button>
               <view class="toggle-line">
                 <view class="muted">可选</view>

@@ -2,6 +2,35 @@
 
 本仓库的变更日志，每次代码修改后追加。日期为本地时区（Asia/Shanghai）。
 
+## 2026-05-21
+
+### 新增：菜品软删除 + 新时段自动复用历史菜品
+**动机**：
+- 食堂常常想下架某个菜品但保留其历史订单关联，原来只能用「不可选」开关藏起来，列表里仍堆积大量陈旧菜品。
+- 新建一天的时段后，菜品需要从零手动录入，而绝大多数日子的菜单结构与最近一次同餐次几乎一致，重复劳动。
+
+**改动**：
+- `backend/app/models/entities.py`、`backend/sql/schema.sql`、`backend/app/db/init_db.py`：`meal_packages` 新增 `is_deleted TINYINT(1) NOT NULL DEFAULT 0`；启动时自动补列，方便已部署环境无感升级。
+- `backend/app/services/meal_package_service.py`（新文件）：
+  - `visible_packages(packages)`：内存层面过滤掉 `is_deleted`。
+  - `clone_latest_packages_to_slot(db, slot)`：若 `slot` 当前没有任何菜品，复制「同餐次、`meal_date` 严格早于当前 slot」中最近一份模板的所有非删除菜品及其 `MealPackageItem`，sort_order/价格/图片/营养字段全量拷贝。返回克隆的菜品数。
+- `backend/app/api/v1/admin.py`：
+  - `_to_meal_slot_out` 使用 `visible_packages` 过滤已删除菜品。
+  - `create_meal_package` 计算 `max_sort` 时排除已删除菜品；新建 `MealPackage` 显式 `is_deleted=False`。
+  - `update_meal_package` 对已删除菜品返回 404（防止前端绕过列表过滤直接 PATCH）。
+  - `create_or_update_meal_slot`：仅在「确实是首次创建」该 slot 时调用 `clone_latest_packages_to_slot`，写入与本身的 upsert 同一事务一次性提交。
+  - 新增 `DELETE /admin/meal-packages/{package_id}`：把 `is_deleted` 置 1、`is_selectable` 置 0，写审计日志（`detail_json` 含 `slot_id`/`meal_date`/`package_name`，便于追溯）。
+- `backend/app/api/v1/meals.py`：`list_slots` 在序列化时过滤 `pkg.is_deleted or not pkg.is_selectable`。**不在 GET 中触发克隆副作用**——克隆只在管理员显式创建新 slot 时发生，避免用户列表查询并发触发竞态/重复写入。
+- `backend/app/services/order_service.py`：下单时 `select(MealPackage)` 增加 `is_deleted.is_(False)` 过滤；循环校验中追加 `pkg.is_deleted` 检查（双保险），错误信息维持原有「部分菜品不可选或不属于当前时段」。
+- `miniprogram/services/api.js`：新增 `deleteAdminMealPackage(packageId)`，走 `DELETE /admin/meal-packages/{id}`。
+- `miniprogram/pages/admin-meals/index.{js,wxml,wxss}`：菜品卡新增「删除菜品」按钮，点击后 `wx.showModal` 红色确认；提示文案补充「可复用历史菜品」一句，并增加 `.delete-btn { white-space: nowrap }` 样式微调。
+- `miniprogram/pages/admin-stats/index.{wxml,wxss}`：顶部 action 行由内联按钮改为 2 列 `grid` 网格，统一按钮高度与间距，新增 `.top-action-logout` 暖色调突出退出。
+
+**注意**：
+- `clone_latest_packages_to_slot` 选模板时已用 `MealSlot.meal_date < slot.meal_date` 过滤，回填历史日期的 slot 不会克隆到未来 slot 的菜品。
+- 软删除依赖代码层过滤；任何新增 `select(MealPackage)` 的位置都需要主动加 `is_deleted.is_(False)`，否则会把幽灵菜品漏出。已审计目前所有调用点：admin 列表（经 `visible_packages`）、用户列表（`meals.list_slots`）、下单（`order_service`）、`max_sort` 取值——均已覆盖。
+- 数据库 `meal_packages` 没有 `(slot_id, package_code) WHERE is_deleted=0` 的部分唯一索引，目前依赖 `_pick_available_package_code` 重试避免冲突；若后续把唯一约束改为不区分 `is_deleted`，将出现「复活」编码冲突，届时需要再处理。
+
 ## 2026-05-20
 
 ### 修复：代码评审打回的 5 处小问题

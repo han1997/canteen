@@ -106,3 +106,41 @@
   font-size: 25rpx;
   font-weight: 700;
 }
+
+.top-actions {
+  width: 360rpx;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10rpx;
+}
+
+.top-action-btn {
+  margin: 0;
+  min-width: 0;
+  height: 58rpx;
+  line-height: 58rpx;
+  padding: 0 12rpx;
+  border-radius: 14rpx;
+  background: linear-gradient(145deg, #eef4ff 0%, #dbe9fa 100%);
+  border: 1rpx solid #cdddf5;
+  color: #12365f;
+  font-size: 24rpx;
+  font-weight: 700;
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-action-logout {
+  background: linear-gradient(145deg, #fff1ea 0%, #ffe3d6 100%);
+  border-color: #f0c7b1;
+  color: #9a3412;
+}
+
+@media (max-width: 680rpx) {
+  .top-actions {
+    width: 100%;
+    margin-top: 14rpx;
+  }
+}

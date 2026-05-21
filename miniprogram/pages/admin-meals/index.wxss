@@ -162,6 +162,10 @@
   margin: 0;
 }
 
+.delete-btn {
+  white-space: nowrap;
+}
+
 .add-card {
   margin-top: 16rpx;
   padding: 16rpx;

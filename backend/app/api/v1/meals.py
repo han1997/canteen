@@ -34,7 +34,7 @@ def list_slots(
     for slot in slots:
         packages: list[MealPackageOut] = []
         for pkg in sorted(slot.packages, key=lambda p: p.sort_order):
-            if not pkg.is_selectable:
+            if pkg.is_deleted or not pkg.is_selectable:
                 continue
             items = [
                 MealItemOut(

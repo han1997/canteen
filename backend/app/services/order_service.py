@@ -43,13 +43,15 @@ def create_or_replace_order(
         raise HTTPException(status_code=400, detail="请至少选择 1 份菜品")
 
     package_ids = list(quantity_by_package.keys())
-    package_list = db.scalars(select(MealPackage).where(MealPackage.id.in_(package_ids))).all()
+    package_list = db.scalars(
+        select(MealPackage).where(MealPackage.id.in_(package_ids), MealPackage.is_deleted.is_(False))
+    ).all()
     package_map = {pkg.id: pkg for pkg in package_list}
     if len(package_map) != len(package_ids):
         raise HTTPException(status_code=400, detail="部分菜品不存在")
 
     for pkg in package_map.values():
-        if pkg.slot_id != slot_id or not pkg.is_selectable:
+        if pkg.slot_id != slot_id or pkg.is_deleted or not pkg.is_selectable:
             raise HTTPException(status_code=400, detail="部分菜品不可选或不属于当前时段")
 
     primary_package_id = sorted(package_ids)[0]

@@ -32,6 +32,11 @@ def _ensure_legacy_columns() -> None:
         "image_url",
         "ALTER TABLE meal_packages ADD COLUMN image_url VARCHAR(255) NULL",
     )
+    _ensure_column(
+        "meal_packages",
+        "is_deleted",
+        "ALTER TABLE meal_packages ADD COLUMN is_deleted TINYINT(1) NOT NULL DEFAULT 0",
+    )
 
 
 def init_db() -> None:

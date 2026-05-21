@@ -159,6 +159,13 @@ function updateAdminMealPackage(packageId, payload) {
   });
 }
 
+function deleteAdminMealPackage(packageId) {
+  return request({
+    url: `/admin/meal-packages/${packageId}`,
+    method: "DELETE"
+  });
+}
+
 function uploadAdminMealImage(filePath) {
   const app = getApp();
   const token = (app && app.globalData && app.globalData.token) || wx.getStorageSync("token") || "";
@@ -271,6 +278,7 @@ module.exports = {
   updateAdminMealSlotStatus,
   createAdminMealPackage,
   updateAdminMealPackage,
+  deleteAdminMealPackage,
   uploadAdminMealImage,
   getStatsSummary,
   getBreakfastItemStats,

@@ -210,7 +210,7 @@ Page({
         meal_type: mealType,
         is_open: true
       });
-      toast("时段已发布", "success");
+      toast("时段已发布，可复用历史菜品", "success");
       await this.loadSlots();
     } catch (err) {
       toast(err.message || "发布时段失败");
@@ -285,6 +285,37 @@ Page({
       await this.loadSlots();
     } catch (err) {
       toast(err.message || "更新菜品失败");
+    }
+  },
+
+  async deletePackage(e) {
+    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
+    const pkgIndex = Number(e.currentTarget.dataset.pkgIndex);
+    const slot = this.data.slots[slotIndex];
+    const pkg = slot && slot.packages ? slot.packages[pkgIndex] : null;
+    if (!pkg) {
+      return;
+    }
+
+    const confirmed = await new Promise((resolve) => {
+      wx.showModal({
+        title: "删除菜品",
+        content: `确认删除“${pkg.packageName}”吗？`,
+        confirmColor: "#b42318",
+        success: (res) => resolve(!!res.confirm),
+        fail: () => resolve(false)
+      });
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await api.deleteAdminMealPackage(pkg.id);
+      toast("菜品已删除", "success");
+      await this.loadSlots();
+    } catch (err) {
+      toast(err.message || "删除菜品失败");
     }
   },
 

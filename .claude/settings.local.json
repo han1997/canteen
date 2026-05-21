@@ -24,7 +24,9 @@
       "Bash(node --check miniprogram/pages/profile/index.js)",
       "Bash(node --check miniprogram/pages/my-orders/index.js)",
       "Bash(node --check miniprogram/pages/admin-stats/index.js)",
-      "Bash(python -c \"import ast; ast.parse\\(open\\('backend/app/api/v1/orders.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('backend/app/schemas/order.py', encoding='utf-8'\\).read\\(\\)\\); print\\('py ok'\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\('backend/app/api/v1/orders.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('backend/app/schemas/order.py', encoding='utf-8'\\).read\\(\\)\\); print\\('py ok'\\)\")",
+      "Bash(git checkout *)",
+      "Bash(git stash *)"
     ]
   }
 }

@@ -42,6 +42,7 @@ from app.schemas.admin_meal import (
 )
 from app.schemas.common import ApiMessage
 from app.services.audit_service import write_audit
+from app.services.meal_package_service import clone_latest_packages_to_slot, visible_packages
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -124,7 +125,10 @@ def _to_meal_slot_out(slot: MealSlot) -> AdminMealSlotOut:
         meal_type=slot.meal_type.value,
         booking_deadline=slot.booking_deadline,
         is_open=slot.is_open,
-        packages=[_to_meal_package_out(pkg) for pkg in sorted(slot.packages, key=lambda value: value.sort_order)],
+        packages=[
+            _to_meal_package_out(pkg)
+            for pkg in sorted(visible_packages(slot.packages), key=lambda value: value.sort_order)
+        ],
     )
 
 
@@ -343,10 +347,12 @@ def create_or_update_meal_slot(
     db: Annotated[Session, Depends(get_db)],
 ):
     meal_type = MealTypeEnum(payload.meal_type)
+    is_new_slot = False
     slot = db.scalar(
         select(MealSlot).where(MealSlot.meal_date == payload.meal_date, MealSlot.meal_type == meal_type)
     )
     if not slot:
+        is_new_slot = True
         slot = MealSlot(
             meal_date=payload.meal_date,
             meal_type=meal_type,
@@ -371,6 +377,8 @@ def create_or_update_meal_slot(
         request_ip=request.client.host if request.client else None,
         detail_json={"meal_date": str(payload.meal_date), "meal_type": payload.meal_type, "is_open": payload.is_open},
     )
+    if is_new_slot:
+        clone_latest_packages_to_slot(db, slot)
     db.commit()
     slot = _load_slot(db, slot.id)
     return _to_meal_slot_out(slot)
@@ -415,7 +423,15 @@ def create_meal_package(
         raise HTTPException(status_code=404, detail="订餐时段不存在")
 
     meal_category = MealCategoryEnum.NORMAL if slot.meal_type == MealTypeEnum.BREAKFAST else MealCategoryEnum(payload.meal_category)
-    max_sort = db.scalar(select(func.max(MealPackage.sort_order)).where(MealPackage.slot_id == slot_id)) or 0
+    max_sort = (
+        db.scalar(
+            select(func.max(MealPackage.sort_order)).where(
+                MealPackage.slot_id == slot_id,
+                MealPackage.is_deleted.is_(False),
+            )
+        )
+        or 0
+    )
 
     pkg: MealPackage | None = None
     preferred_code = payload.package_code
@@ -430,6 +446,7 @@ def create_meal_package(
                     package_name=payload.package_name,
                     meal_category=meal_category,
                     is_selectable=payload.is_selectable,
+                    is_deleted=False,
                     image_url=payload.image_url or settings.default_meal_image_url,
                     price=payload.price,
                     calories=payload.calories,
@@ -488,7 +505,7 @@ def update_meal_package(
         .where(MealPackage.id == package_id)
         .options(joinedload(MealPackage.items), joinedload(MealPackage.slot))
     )
-    if not pkg:
+    if not pkg or pkg.is_deleted:
         raise HTTPException(status_code=404, detail="菜品不存在")
 
     provided_fields = payload.model_fields_set
@@ -577,3 +594,37 @@ async def upload_meal_image(
     )
     db.commit()
     return {"image_url": image_url}
+
+
+@router.delete("/meal-packages/{package_id}", response_model=ApiMessage, dependencies=MEAL_MANAGE_DEPS)
+def delete_meal_package(
+    package_id: int,
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    pkg = db.scalar(
+        select(MealPackage)
+        .where(MealPackage.id == package_id)
+        .options(joinedload(MealPackage.slot))
+    )
+    if not pkg or pkg.is_deleted:
+        raise HTTPException(status_code=404, detail="菜品不存在")
+
+    pkg.is_deleted = True
+    pkg.is_selectable = False
+    write_audit(
+        db,
+        actor_user_id=current_user.id,
+        action="DELETE_MEAL_PACKAGE",
+        target_type="meal_package",
+        target_id=str(package_id),
+        request_ip=request.client.host if request.client else None,
+        detail_json={
+            "slot_id": pkg.slot_id,
+            "meal_date": str(pkg.slot.meal_date) if pkg.slot else None,
+            "package_name": pkg.package_name,
+        },
+    )
+    db.commit()
+    return ApiMessage(message="菜品已删除")
