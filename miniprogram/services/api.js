@@ -143,11 +143,18 @@ function updateAdminMealSlotStatus(slotId, isOpen) {
   });
 }
 
-function createAdminMealPackage(slotId, payload) {
+function createAdminMealPackage(payload) {
   return request({
-    url: `/admin/meal-slots/${slotId}/packages`,
+    url: "/admin/meal-packages",
     method: "POST",
     data: payload
+  });
+}
+
+function getAdminMealPackages(mealType) {
+  return request({
+    url: "/admin/meal-packages",
+    query: mealType ? { meal_type: mealType } : undefined
   });
 }
 
@@ -277,6 +284,7 @@ module.exports = {
   createOrUpdateAdminMealSlot,
   updateAdminMealSlotStatus,
   createAdminMealPackage,
+  getAdminMealPackages,
   updateAdminMealPackage,
   deleteAdminMealPackage,
   uploadAdminMealImage,

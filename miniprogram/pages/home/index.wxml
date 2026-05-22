@@ -76,9 +76,6 @@
               <text class="pkg-cat">{{slot.isBreakfast ? '单点' : pkg.categoryLabel}}</text>
             </view>
             <view class="price-line">¥{{pkg.price || 0}}</view>
-            <view wx:if="{{!slot.isBreakfast}}" class="muted nutrition-line">
-              {{pkg.calories || '-'}} kcal · 蛋白 {{pkg.proteinG || '-'}}g · 碳水 {{pkg.carbsG || '-'}}g
-            </view>
             <view class="qty-row">
               <view
                 class="qty-btn {{!slot.canBook ? 'qty-disabled' : ''}}"

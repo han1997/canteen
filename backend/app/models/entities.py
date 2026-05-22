@@ -91,15 +91,16 @@ class MealSlot(Base, TimestampMixin):
     is_open: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
 
-    packages = relationship("MealPackage", back_populates="slot")
-
 
 class MealPackage(Base, TimestampMixin):
     __tablename__ = "meal_packages"
-    __table_args__ = (UniqueConstraint("slot_id", "package_code", name="uk_meal_packages_slot_code"),)
+    __table_args__ = (UniqueConstraint("meal_type", "package_code", name="uk_meal_packages_type_code"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    slot_id: Mapped[int] = mapped_column(ForeignKey("meal_slots.id"), nullable=False)
+    meal_type: Mapped[MealTypeEnum] = mapped_column(
+        SAEnum(MealTypeEnum, values_callable=_enum_values, validate_strings=True),
+        nullable=False,
+    )
     package_code: Mapped[str] = mapped_column(String(64), nullable=False)
     package_name: Mapped[str] = mapped_column(String(128), nullable=False)
     meal_category: Mapped[MealCategoryEnum] = mapped_column(
@@ -116,7 +117,6 @@ class MealPackage(Base, TimestampMixin):
     fat_g: Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    slot = relationship("MealSlot", back_populates="packages")
     items = relationship("MealPackageItem", back_populates="package")
 
 

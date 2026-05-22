@@ -6,6 +6,12 @@
 
 .hero-head {
   align-items: flex-start;
+  gap: 12rpx;
+}
+
+.hero-head > view:first-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .helper-text {
@@ -13,7 +19,14 @@
 }
 
 .ghost-btn {
-  margin-left: 12rpx;
+  margin: 0;
+  flex: 0 0 auto;
+  height: 56rpx;
+  line-height: 56rpx;
+  padding: 0 18rpx;
+  font-size: 24rpx;
+  border-radius: 14rpx;
+  white-space: nowrap;
 }
 
 .picker-row {
@@ -29,19 +42,29 @@
   border: 1rpx solid #d3def0;
 }
 
-.create-grid {
-  margin-top: 14rpx;
+.meal-tabs {
+  margin-top: 16rpx;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12rpx;
+  gap: 10rpx;
 }
 
-.create-chip {
-  border-radius: 999rpx;
-  background: linear-gradient(135deg, #edf5ff 0%, #dbe9fd 100%);
-  color: #0b2a4a;
-  font-size: 24rpx;
-  border: 1rpx solid #cedff7;
+.meal-tab {
+  height: 64rpx;
+  line-height: 64rpx;
+  text-align: center;
+  border-radius: 14rpx;
+  border: 1rpx solid #d3def0;
+  background: #f4f7fc;
+  color: #475569;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.meal-tab-active {
+  background: linear-gradient(135deg, #0b2a4a 0%, #1e5fb6 100%);
+  border-color: #0b2a4a;
+  color: #ffffff;
 }
 
 .slot-shell {
@@ -145,25 +168,43 @@
 }
 
 .pkg-actions {
-  margin-top: 10rpx;
+  margin-top: 12rpx;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 10rpx;
 }
 
 .toggle-line {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  gap: 12rpx;
+}
+
+.action-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 10rpx;
+}
+
+.action-row.two-cols {
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .action-btn {
   margin: 0;
+  height: 64rpx;
+  line-height: 64rpx;
+  padding: 0 12rpx;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 0;
 }
 
-.delete-btn {
-  white-space: nowrap;
+.action-btn::after {
+  border: none;
 }
 
 .add-card {
@@ -180,4 +221,5 @@
 
 .new-tip {
   font-size: 22rpx;
+  margin: 10rpx 0 4rpx;
 }

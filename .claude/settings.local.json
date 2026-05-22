@@ -26,7 +26,10 @@
       "Bash(node --check miniprogram/pages/admin-stats/index.js)",
       "Bash(python -c \"import ast; ast.parse\\(open\\('backend/app/api/v1/orders.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('backend/app/schemas/order.py', encoding='utf-8'\\).read\\(\\)\\); print\\('py ok'\\)\")",
       "Bash(git checkout *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(python -m py_compile app/api/v1/admin.py app/api/v1/meals.py app/services/order_service.py app/services/meal_package_service.py)",
+      "Bash(python -m py_compile app/api/v1/admin.py app/api/v1/meals.py app/services/order_service.py app/services/meal_package_service.py app/models/entities.py app/db/init_db.py)",
+      "Bash(python -m py_compile app/api/v1/admin.py app/api/v1/meals.py app/services/order_service.py app/models/entities.py app/db/init_db.py app/schemas/admin_meal.py)"
     ]
   }
 }

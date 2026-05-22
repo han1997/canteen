@@ -13,7 +13,7 @@ class AdminMealItemOut(BaseModel):
 
 class AdminMealPackageOut(BaseModel):
     id: int
-    slot_id: int
+    meal_type: str
     package_code: str
     package_name: str
     meal_category: str
@@ -34,7 +34,6 @@ class AdminMealSlotOut(BaseModel):
     meal_type: str
     booking_deadline: datetime
     is_open: bool
-    packages: list[AdminMealPackageOut]
 
 
 class AdminMealSlotCreateRequest(BaseModel):
@@ -49,6 +48,7 @@ class AdminMealSlotStatusUpdateRequest(BaseModel):
 
 
 class AdminMealPackageCreateRequest(BaseModel):
+    meal_type: str = Field(pattern="^(breakfast|lunch|dinner)$")
     package_name: str = Field(min_length=1, max_length=128)
     package_code: str | None = Field(default=None, max_length=64)
     meal_category: str = Field(default="normal", pattern="^(normal|fat_loss)$")

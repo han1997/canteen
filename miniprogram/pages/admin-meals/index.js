@@ -1,5 +1,4 @@
 const api = require("../../services/api");
-const { todayString } = require("../../utils/date");
 const { withPullDownRefresh } = require("../../utils/pull-refresh");
 const { getApiBaseUrl } = require("../../config/env");
 
@@ -101,12 +100,41 @@ function compressImageFile(filePath) {
   });
 }
 
+function emptyDraft() {
+  return {
+    packageName: "",
+    imageUrl: DEFAULT_MEAL_IMAGE_URL,
+    imagePreviewUrl: toPreviewImageUrl(DEFAULT_MEAL_IMAGE_URL),
+    priceInput: "",
+    categoryIndex: 0
+  };
+}
+
+function formatPackage(pkg) {
+  return {
+    id: pkg.id,
+    mealType: pkg.meal_type,
+    packageName: pkg.package_name,
+    imageUrl: resolveImageUrl(pkg.image_url),
+    imagePreviewUrl: toPreviewImageUrl(resolveImageUrl(pkg.image_url)),
+    priceInput: String(pkg.price || 0),
+    selectable: !!pkg.is_selectable,
+    categoryIndex: categoryIndex(pkg.meal_category)
+  };
+}
+
 Page({
   data: {
     allowed: false,
     loading: false,
-    mealDate: todayString(),
-    slots: [],
+    activeIndex: 0,
+    mealTypes: MEAL_TYPES,
+    packagesByType: { breakfast: [], lunch: [], dinner: [] },
+    drafts: {
+      breakfast: emptyDraft(),
+      lunch: emptyDraft(),
+      dinner: emptyDraft()
+    },
     categoryLabels: CATEGORY_OPTIONS.map((item) => item.label)
   },
 
@@ -118,7 +146,7 @@ Page({
     }
     await this.ensureAccess();
     if (this.data.allowed) {
-      await this.loadSlots();
+      await this.loadPackages();
     }
   },
 
@@ -126,7 +154,7 @@ Page({
     async function () {
       await this.ensureAccess();
       if (this.data.allowed) {
-        await this.loadSlots();
+        await this.loadPackages();
       }
     },
     { guard() { return !!this._pickingImage; } }
@@ -154,40 +182,21 @@ Page({
     });
   },
 
-  formatSlots(slots) {
-    return (slots || []).map((slot) => ({
-      id: slot.id,
-      mealType: slot.meal_type,
-      mealTypeLabel: MEAL_TYPES.find((item) => item.value === slot.meal_type)?.label || slot.meal_type,
-      isBreakfast: slot.meal_type === "breakfast",
-      isOpen: !!slot.is_open,
-      bookingDeadline: slot.booking_deadline,
-      packages: (slot.packages || []).map((pkg) => ({
-        id: pkg.id,
-        packageName: pkg.package_name,
-        imageUrl: resolveImageUrl(pkg.image_url),
-        imagePreviewUrl: toPreviewImageUrl(resolveImageUrl(pkg.image_url)),
-        priceInput: String(pkg.price || 0),
-        selectable: !!pkg.is_selectable,
-        categoryIndex: categoryIndex(pkg.meal_category)
-      })),
-      draft: {
-        packageName: "",
-        imageUrl: DEFAULT_MEAL_IMAGE_URL,
-        imagePreviewUrl: toPreviewImageUrl(DEFAULT_MEAL_IMAGE_URL),
-        priceInput: "",
-        categoryIndex: 0
-      }
-    }));
+  activeMealType() {
+    return MEAL_TYPES[this.data.activeIndex].value;
   },
 
-  async loadSlots() {
+  async loadPackages() {
     this.setData({ loading: true });
     try {
-      const slots = await api.getAdminMealSlots(this.data.mealDate);
-      this.setData({
-        slots: this.formatSlots(slots)
+      const pkgs = await api.getAdminMealPackages();
+      const grouped = { breakfast: [], lunch: [], dinner: [] };
+      (pkgs || []).forEach((pkg) => {
+        if (grouped[pkg.meal_type]) {
+          grouped[pkg.meal_type].push(formatPackage(pkg));
+        }
       });
+      this.setData({ packagesByType: grouped });
     } catch (err) {
       toast(err.message || "加载菜品失败");
     } finally {
@@ -195,70 +204,43 @@ Page({
     }
   },
 
-  onDateChange(e) {
-    this.setData({
-      mealDate: e.detail.value
-    });
-    this.loadSlots();
-  },
-
-  async createSlot(e) {
-    const mealType = e.currentTarget.dataset.mealType;
-    try {
-      await api.createOrUpdateAdminMealSlot({
-        meal_date: this.data.mealDate,
-        meal_type: mealType,
-        is_open: true
-      });
-      toast("时段已发布，可复用历史菜品", "success");
-      await this.loadSlots();
-    } catch (err) {
-      toast(err.message || "发布时段失败");
+  onTabChange(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    if (Number.isNaN(idx) || idx === this.data.activeIndex) {
+      return;
     }
-  },
-
-  async onSlotOpenChange(e) {
-    const slotId = Number(e.currentTarget.dataset.slotId);
-    const isOpen = !!e.detail.value;
-    try {
-      await api.updateAdminMealSlotStatus(slotId, isOpen);
-      toast(isOpen ? "已开放订餐" : "已停止订餐", "success");
-      await this.loadSlots();
-    } catch (err) {
-      toast(err.message || "更新时段状态失败");
-    }
+    this.setData({ activeIndex: idx });
   },
 
   onPackageInput(e) {
-    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
     const pkgIndex = Number(e.currentTarget.dataset.pkgIndex);
     const field = e.currentTarget.dataset.field;
+    const mealType = this.activeMealType();
     this.setData({
-      [`slots[${slotIndex}].packages[${pkgIndex}].${field}`]: e.detail.value
+      [`packagesByType.${mealType}[${pkgIndex}].${field}`]: e.detail.value
     });
   },
 
   onPackageSelectableChange(e) {
-    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
     const pkgIndex = Number(e.currentTarget.dataset.pkgIndex);
+    const mealType = this.activeMealType();
     this.setData({
-      [`slots[${slotIndex}].packages[${pkgIndex}].selectable`]: !!e.detail.value
+      [`packagesByType.${mealType}[${pkgIndex}].selectable`]: !!e.detail.value
     });
   },
 
   onPackageCategoryChange(e) {
-    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
     const pkgIndex = Number(e.currentTarget.dataset.pkgIndex);
+    const mealType = this.activeMealType();
     this.setData({
-      [`slots[${slotIndex}].packages[${pkgIndex}].categoryIndex`]: Number(e.detail.value)
+      [`packagesByType.${mealType}[${pkgIndex}].categoryIndex`]: Number(e.detail.value)
     });
   },
 
   async savePackage(e) {
-    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
     const pkgIndex = Number(e.currentTarget.dataset.pkgIndex);
-    const slot = this.data.slots[slotIndex];
-    const pkg = slot.packages[pkgIndex];
+    const mealType = this.activeMealType();
+    const pkg = this.data.packagesByType[mealType][pkgIndex];
     const price = Number(pkg.priceInput || 0);
     if (!pkg.packageName.trim()) {
       toast("菜品名称不能为空");
@@ -275,24 +257,23 @@ Page({
       price,
       is_selectable: pkg.selectable
     };
-    if (!slot.isBreakfast) {
+    if (mealType !== "breakfast") {
       payload.meal_category = CATEGORY_OPTIONS[pkg.categoryIndex].value;
     }
 
     try {
       await api.updateAdminMealPackage(pkg.id, payload);
       toast("菜品已更新", "success");
-      await this.loadSlots();
+      await this.loadPackages();
     } catch (err) {
       toast(err.message || "更新菜品失败");
     }
   },
 
   async deletePackage(e) {
-    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
     const pkgIndex = Number(e.currentTarget.dataset.pkgIndex);
-    const slot = this.data.slots[slotIndex];
-    const pkg = slot && slot.packages ? slot.packages[pkgIndex] : null;
+    const mealType = this.activeMealType();
+    const pkg = this.data.packagesByType[mealType][pkgIndex];
     if (!pkg) {
       return;
     }
@@ -300,7 +281,7 @@ Page({
     const confirmed = await new Promise((resolve) => {
       wx.showModal({
         title: "删除菜品",
-        content: `确认删除“${pkg.packageName}”吗？`,
+        content: `确认删除“${pkg.packageName}”吗？\n未核销的相关订单会被自动取消。`,
         confirmColor: "#b42318",
         success: (res) => resolve(!!res.confirm),
         fail: () => resolve(false)
@@ -313,31 +294,30 @@ Page({
     try {
       await api.deleteAdminMealPackage(pkg.id);
       toast("菜品已删除", "success");
-      await this.loadSlots();
+      await this.loadPackages();
     } catch (err) {
       toast(err.message || "删除菜品失败");
     }
   },
 
   onDraftInput(e) {
-    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
     const field = e.currentTarget.dataset.field;
+    const mealType = this.activeMealType();
     this.setData({
-      [`slots[${slotIndex}].draft.${field}`]: e.detail.value
+      [`drafts.${mealType}.${field}`]: e.detail.value
     });
   },
 
   onDraftCategoryChange(e) {
-    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
+    const mealType = this.activeMealType();
     this.setData({
-      [`slots[${slotIndex}].draft.categoryIndex`]: Number(e.detail.value)
+      [`drafts.${mealType}.categoryIndex`]: Number(e.detail.value)
     });
   },
 
-  async addPackage(e) {
-    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
-    const slot = this.data.slots[slotIndex];
-    const draft = slot.draft;
+  async addPackage() {
+    const mealType = this.activeMealType();
+    const draft = this.data.drafts[mealType];
     const name = draft.packageName.trim();
     const price = Number(draft.priceInput || 0);
     if (!name) {
@@ -350,26 +330,30 @@ Page({
     }
 
     const payload = {
+      meal_type: mealType,
       package_name: name,
       image_url: resolveImageUrl(draft.imageUrl),
       price
     };
-    if (!slot.isBreakfast) {
+    if (mealType !== "breakfast") {
       payload.meal_category = CATEGORY_OPTIONS[draft.categoryIndex].value;
     }
 
     try {
-      await api.createAdminMealPackage(slot.id, payload);
+      await api.createAdminMealPackage(payload);
       toast("菜品已新增", "success");
-      await this.loadSlots();
+      this.setData({
+        [`drafts.${mealType}`]: emptyDraft()
+      });
+      await this.loadPackages();
     } catch (err) {
       toast(err.message || "新增菜品失败");
     }
   },
 
   async choosePackageImage(e) {
-    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
     const pkgIndex = Number(e.currentTarget.dataset.pkgIndex);
+    const mealType = this.activeMealType();
     this._pickingImage = true;
     try {
       const filePath = await chooseImageFile();
@@ -377,8 +361,8 @@ Page({
       wx.showLoading({ title: "上传中" });
       const imageUrl = await api.uploadAdminMealImage(compressedPath);
       this.setData({
-        [`slots[${slotIndex}].packages[${pkgIndex}].imageUrl`]: imageUrl,
-        [`slots[${slotIndex}].packages[${pkgIndex}].imagePreviewUrl`]: toPreviewImageUrl(imageUrl)
+        [`packagesByType.${mealType}[${pkgIndex}].imageUrl`]: imageUrl,
+        [`packagesByType.${mealType}[${pkgIndex}].imagePreviewUrl`]: toPreviewImageUrl(imageUrl)
       });
       toast("图片已上传", "success");
     } catch (err) {
@@ -392,8 +376,8 @@ Page({
     }
   },
 
-  async chooseDraftImage(e) {
-    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
+  async chooseDraftImage() {
+    const mealType = this.activeMealType();
     this._pickingImage = true;
     try {
       const filePath = await chooseImageFile();
@@ -401,8 +385,8 @@ Page({
       wx.showLoading({ title: "上传中" });
       const imageUrl = await api.uploadAdminMealImage(compressedPath);
       this.setData({
-        [`slots[${slotIndex}].draft.imageUrl`]: imageUrl,
-        [`slots[${slotIndex}].draft.imagePreviewUrl`]: toPreviewImageUrl(imageUrl)
+        [`drafts.${mealType}.imageUrl`]: imageUrl,
+        [`drafts.${mealType}.imagePreviewUrl`]: toPreviewImageUrl(imageUrl)
       });
       toast("图片已上传", "success");
     } catch (err) {

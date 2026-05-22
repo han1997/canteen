@@ -2,7 +2,69 @@
 
 本仓库的变更日志，每次代码修改后追加。日期为本地时区（Asia/Shanghai）。
 
+## 2026-05-22
+
+### 调整：UI 排版打磨
+**动机**：订餐页菜品卡的「kcal · 蛋白 · 碳水」一行信息密度过低、几乎都是 `-`，用户实际不看；管理页按钮文字「保存菜品/删除菜品/更换图片」挤一行频繁换行，「退出登录」按钮在顶栏被 helper-text 挤成竖列，视觉上很糟。
+
+**改动**：
+- `miniprogram/pages/home/index.wxml`：删除 `.nutrition-line`（`kcal · 蛋白 · 碳水`）整行。
+- `miniprogram/pages/admin-meals/index.wxml`：菜品卡的 `.pkg-actions` 重组——「可选开关」单独一行靠右；下方 3 个按钮（更换图片 / 删除菜品 / 保存菜品）用 grid 等分一行。「新增菜品」区把 `.new-tip` 提示文字提到按钮行上方独占一行，按钮（上传图片 / 新增菜品）等分两列。
+- `miniprogram/pages/admin-meals/index.wxss`：
+  - `.hero-head` 加 `gap: 12rpx`，左侧 `view:first-child { flex: 1; min-width: 0 }`；`.ghost-btn` 改为 `flex: 0 0 auto; white-space: nowrap`，固定 56rpx 高度——防止 helper-text 把退出登录按钮挤到下一行。
+  - `.pkg-actions` 改 `flex-direction: column`；新增 `.action-row` (grid 3 列等分) 与 `.action-row.two-cols` (2 列)；`.action-btn` 加 `white-space: nowrap; min-width: 0`、统一 64rpx 高度与 24rpx 字号、`::after { border: none }` 抹除默认边框扰动。
+  - 移除已废弃的 `.delete-btn { white-space: nowrap }` 规则。
+
+### 调整：菜品从「按日期 slot」改为「按 meal_type 模板」
+**动机**：菜品原本绑定到具体 slot（meal_date + meal_type），导致每天都要单独维护一份菜单；从「今天录入的菜品自动同步到未来 slot」一路改到「打开管理页时按需补齐」越改越绕。需求实际上是「早/中/晚各一份模板，每天复用」，没有按日切换菜单的诉求。
+
+**改动**：
+- 数据模型：`meal_packages.slot_id` → `meal_packages.meal_type`（ENUM）；唯一约束 `(slot_id, package_code)` → `(meal_type, package_code)`，名称 `uk_meal_packages_slot_code` → `uk_meal_packages_type_code`。`meal_slots` 表结构、关系字段（`is_open` / `booking_deadline` / `meal_date`）保留——订单仍按日期 slot 记录，slot 仍是订单的容器。
+- 迁移：开发环境直接 `TRUNCATE meal_package_items + meal_packages` → drop 旧 FK/UK/column → add 新列与 UK。两种触发路径任选其一：
+  - 后端 `backend/app/db/init_db.py` 中的 `_migrate_meal_packages_to_template()` 会在启动时探测、幂等执行。
+  - 或手动重跑 `backend/sql/schema.sql`：脚本头部增加了幂等迁移段，新部署直接跳过，旧部署原地升级。
+- 模型层（`backend/app/models/entities.py`）：`MealPackage` 删 `slot_id` / `slot` 关系，加 `meal_type` 列；`MealSlot.packages` 关系删除。
+- 后端 API：
+  - 新增 `GET /admin/meal-packages?meal_type=` — 列出所有未删除模板菜品，可按餐次过滤。
+  - 原 `POST /admin/meal-slots/{slot_id}/packages` → `POST /admin/meal-packages`，body 必带 `meal_type`。
+  - `PATCH /admin/meal-packages/{id}` / `DELETE /admin/meal-packages/{id}` 路径不变；其中 DELETE 联动订单的查询条件改为「`MealSlot.meal_type == pkg.meal_type` 且 `meal_date >= today` 且 `booking_deadline > now` 且 status NOT IN (VERIFIED, CANCELLED)」——只影响未来仍可改的订单，按 `OrderItem.item_name` 匹配清理。
+  - `GET /admin/meal-slots` 不再返回 packages 字段（slot 与菜品解耦）。
+  - 用户端 `GET /meals/slots?meal_date=` 响应形状不变：后端按 slot.meal_type 查模板填入 packages；前端无须改动。
+  - `order_service.create_or_replace_order` 校验由 `pkg.slot_id != slot_id` 改为 `pkg.meal_type != slot.meal_type`。
+- 后端废弃 `app.services.meal_package_service` 整个模块（克隆/合并补齐逻辑全部不再需要）；admin.py 移除相关 import。
+- Schema（`backend/sql/schema.sql`）：`meal_packages` 表 DDL 同步更新；保留 idx_meal_packages_category 索引。
+- 前端：
+  - `miniprogram/services/api.js`：新增 `getAdminMealPackages(mealType?)`；`createAdminMealPackage(payload)` 签名改为单参数（body 带 meal_type）。
+  - `miniprogram/pages/admin-meals/`：完全重写为 3 个 meal_type tab；删去日期 picker、`发布早/中/晚` 按钮、`onSlotOpenChange` 时段开关。每次切 tab 显示对应模板列表与独立的「新增菜品」draft；逻辑上不再涉及任何 slot。
+  - 用户端 `home/index` / `my-orders` / `profile` / 用户端订餐流程：完全不动——后端响应形状保持兼容。
+
+**注意**：
+- 删除一个模板菜品会取消「未来所有同餐次未核销的相关订单」（前一版只取消「同 slot 内」），这是模板模型的必然——若不希望影响其他日期，需要先把订单核销或手动改单。
+- 历史订单（已核销 / 已取消）保留不动；OrderItem 里 item_name 是字符串快照，统计 / 导出 不依赖 meal_packages 行。
+- 一次性迁移会清空 meal_packages + meal_package_items；旧 orders 的 package_id 在迁移后将悬空（外键不再有对应 row），但 schema 上 ON DELETE 没设 CASCADE，约束本身允许悬空（FK 仅在 INSERT/UPDATE 时检查）。开发环境可接受；线上需另外处理。
+- 「时段开/关」UI 暂时从 admin-meals 页面移除；后端 `PATCH /admin/meal-slots/{slot_id}/status` 接口仍保留。若后续需要 UI，可单开「时段管理」页面。
+
 ## 2026-05-21
+
+### 调整：菜品复用从「首次建 slot 克隆」改为「按 package_code 合并补齐」，删除菜品级联未核销订单
+**动机**：
+- 上一版克隆只在「管理员首次创建 slot」分支触发；但 slot 由启动任务/每日定时任务提前播种为空记录后，管理员后续在「最早一天」录入的新菜品就再也进不去未来已存在的同餐次 slot——「今天新增的菜，明天看不到」。
+- 同时上一版没考虑：删除菜品时，已有用户已下单且未核销的订单仍残留该菜品，会出现「订单里有但备餐已下架」的不一致。
+
+**改动**：
+- `backend/app/services/meal_package_service.py`：
+  - 把 `clone_latest_packages_to_slot` 重构为 `sync_packages_from_latest_template(db, slot)`：以 `package_code` 为去重键（同 slot 唯一），对「同餐次、`meal_date` 严格早于本 slot、含未删除菜品」中的最新一份 slot，将其未删除菜品中**本 slot 缺失**的逐项追加（含 `MealPackageItem`），`sort_order` 在当前最大值之后递增。本 slot 已有菜品不会被覆盖、不会被删除，只补齐缺失。
+  - 拆出 `_find_template_slot` 私有函数；模板查询条件与之前一致（同餐次、日期严格早于本日、含非删除菜品）。
+- `backend/app/api/v1/admin.py`：
+  - `list_meal_slots` 中对查询日期 `>= today` 的每个 slot 调用 `sync_packages_from_latest_template`，每次包在 `db.begin_nested()` 中并捕获 `IntegrityError`（防并发同 `(slot_id, package_code)` 重复插入）；若整体新增了条目则 `commit` 并重读。这样「管理员每次打开菜品管理页」都会被动地补齐缺失菜品。
+  - 取消 `create_or_update_meal_slot` 中先前的「首次建 slot 时克隆」逻辑——避免与 list 路径重复触发；slot 创建保持纯 upsert 行为。
+  - `delete_meal_package` 联动同步：定位本 slot 内「未核销且未取消」的所有 Order，按 `OrderItem.item_name == pkg.package_name` 删除匹配条目；若 Order 因此空了，置 `status=CANCELLED`、`cancelled_at=utcnow()`、`note="菜品已下架，订单自动取消"`。审计 `detail_json` 增加 `cancelled_order_ids`、`trimmed_order_ids` 便于追溯。
+
+**注意**：
+- 合并语义是「**仅补齐缺失**」：未来 slot 已有的菜品（哪怕是从更早历史克隆来的旧条目）不会被新菜单覆盖，价格/图片/营养字段也不会被刷新。如需更新某个未来 slot 的现有菜品，仍需走 PATCH。
+- 删除菜品对已核销订单（`VERIFIED`）和已取消订单（`CANCELLED`）不动，保留历史凭证。
+- `OrderItem` 匹配按字符串 `item_name == pkg.package_name`：若历史上有重名菜品，匹配会同时命中——目前 `(slot_id, package_code)` 唯一但 `package_name` 没有唯一约束，理论上同一 slot 内允许重名；接受这个语义（重名等同同一个菜）。
+- `list_meal_slots` 是 GET 但有写入副作用，已通过 `begin_nested` + `IntegrityError` 容错保护并发；用户端 `meals.list_slots` 仍保持纯读，不触发合并。
 
 ### 新增：菜品软删除 + 新时段自动复用历史菜品
 **动机**：

@@ -1,4 +1,5 @@
-﻿from datetime import date
+from collections import defaultdict
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.security import get_current_user
 from app.core.config import settings
 from app.db.session import get_db
-from app.models import MealPackage, MealSlot, User
+from app.models import MealPackage, MealSlot, MealTypeEnum, User
 from app.schemas.meal import MealItemOut, MealPackageOut, MealSlotOut
 
 
@@ -22,20 +23,34 @@ def list_slots(
     meal_date: date = Query(..., description="查询日期，例如 2026-04-14"),
 ):
     _ = current_user
-    slot_stmt = (
+    slots = db.scalars(
         select(MealSlot)
         .where(MealSlot.meal_date == meal_date)
-        .options(joinedload(MealSlot.packages).joinedload(MealPackage.items))
         .order_by(MealSlot.meal_type)
-    )
-    slots = db.scalars(slot_stmt).unique().all()
+    ).all()
+    if not slots:
+        return []
+
+    meal_types = {slot.meal_type for slot in slots}
+    pkgs = db.scalars(
+        select(MealPackage)
+        .where(
+            MealPackage.meal_type.in_(meal_types),
+            MealPackage.is_deleted.is_(False),
+            MealPackage.is_selectable.is_(True),
+        )
+        .options(joinedload(MealPackage.items))
+        .order_by(MealPackage.sort_order)
+    ).unique().all()
+
+    pkgs_by_type: dict[MealTypeEnum, list[MealPackage]] = defaultdict(list)
+    for pkg in pkgs:
+        pkgs_by_type[pkg.meal_type].append(pkg)
 
     result: list[MealSlotOut] = []
     for slot in slots:
         packages: list[MealPackageOut] = []
-        for pkg in sorted(slot.packages, key=lambda p: p.sort_order):
-            if pkg.is_deleted or not pkg.is_selectable:
-                continue
+        for pkg in pkgs_by_type.get(slot.meal_type, []):
             items = [
                 MealItemOut(
                     id=item.id,
@@ -73,4 +88,3 @@ def list_slots(
             )
         )
     return result
-

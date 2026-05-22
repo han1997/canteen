@@ -1,8 +1,12 @@
 -- Canteen mini-program — MySQL 8.0 单文件部署脚本
--- 新部署只需导入本文件，包含建库、建表、默认超管账号。
+-- 新部署：导入本文件，自动建库、建表、写入默认超管账号。
+-- 已有旧部署（meal_packages.slot_id 模型）：本文件包含幂等迁移段，会自动
+--   TRUNCATE meal_packages + meal_package_items，drop 旧 FK/UK/列、加 meal_type 列与新 UK。
+--   注意：迁移会清空所有菜品数据（OrderItem 的 item_name 是快照，订单聚合不受影响；
+--   但 orders.package_id 会变为悬空，仅适用于开发环境）。
 --
 -- 默认超管：警号 900001 / 密码 123456（pbkdf2_sha256 哈希）
--- 部门字段：直接保存名称，默认 “祁门县公安局”。
+-- 部门字段：直接保存名称，默认 "祁门县公安局"。
 --
 -- 字符集统一 utf8mb4，所有外键引用收敛到 users / meal_slots / meal_packages / orders。
 
@@ -52,7 +56,7 @@ CREATE TABLE IF NOT EXISTS meal_slots (
 -- ===========================================================
 CREATE TABLE IF NOT EXISTS meal_packages (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  slot_id BIGINT NOT NULL,
+  meal_type ENUM('breakfast','lunch','dinner') NOT NULL,
   package_code VARCHAR(64) NOT NULL,
   package_name VARCHAR(128) NOT NULL,
   meal_category ENUM('normal','fat_loss') NOT NULL,
@@ -67,8 +71,7 @@ CREATE TABLE IF NOT EXISTS meal_packages (
   sort_order INT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_meal_packages_slot_code (slot_id, package_code),
-  CONSTRAINT fk_meal_packages_slot_id FOREIGN KEY (slot_id) REFERENCES meal_slots(id),
+  UNIQUE KEY uk_meal_packages_type_code (meal_type, package_code),
   INDEX idx_meal_packages_category (meal_category)
 ) ENGINE=InnoDB;
 
@@ -189,9 +192,75 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 ) ENGINE=InnoDB;
 
 -- ===========================================================
+-- 幂等迁移：meal_packages 从 per-slot 改为 per-meal_type 模板
+-- 新部署：所有探测条件均不成立，整段跳过；不会修改新建出的表。
+-- 旧部署：探测到 slot_id 列残留，会 TRUNCATE + DROP 旧 FK/UK/列、ADD 新列与 UK。
+-- ===========================================================
+SET FOREIGN_KEY_CHECKS = 0;
+
+SET @fk_exists = (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'meal_packages'
+    AND CONSTRAINT_NAME = 'fk_meal_packages_slot_id'
+);
+SET @sql = IF(@fk_exists > 0,
+  'ALTER TABLE meal_packages DROP FOREIGN KEY fk_meal_packages_slot_id',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @uk_exists = (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'meal_packages'
+    AND INDEX_NAME = 'uk_meal_packages_slot_code'
+);
+SET @sql = IF(@uk_exists > 0,
+  'ALTER TABLE meal_packages DROP INDEX uk_meal_packages_slot_code',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has_slot_id = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'meal_packages'
+    AND COLUMN_NAME = 'slot_id'
+);
+SET @sql = IF(@has_slot_id > 0, 'TRUNCATE TABLE meal_package_items', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql = IF(@has_slot_id > 0, 'TRUNCATE TABLE meal_packages', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql = IF(@has_slot_id > 0, 'ALTER TABLE meal_packages DROP COLUMN slot_id', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has_meal_type = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'meal_packages'
+    AND COLUMN_NAME = 'meal_type'
+);
+SET @sql = IF(@has_meal_type = 0,
+  "ALTER TABLE meal_packages ADD COLUMN meal_type ENUM('breakfast','lunch','dinner') NOT NULL",
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @new_uk_exists = (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'meal_packages'
+    AND INDEX_NAME = 'uk_meal_packages_type_code'
+);
+SET @sql = IF(@new_uk_exists = 0,
+  'ALTER TABLE meal_packages ADD UNIQUE KEY uk_meal_packages_type_code (meal_type, package_code)',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- ===========================================================
 -- 默认超级管理员
 -- 警号 900001 / 密码 123456（pbkdf2_sha256）
--- 首次登录后请立即在“修改密码”里更换。
+-- 首次登录后请立即在"修改密码"里更换。
 -- ===========================================================
 INSERT INTO users (police_no, real_name, dept_name, role, status, password_hash)
 SELECT '900001', '超级管理员', '祁门县公安局', 'super_admin', 'active',

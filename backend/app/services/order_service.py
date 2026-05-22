@@ -51,7 +51,7 @@ def create_or_replace_order(
         raise HTTPException(status_code=400, detail="部分菜品不存在")
 
     for pkg in package_map.values():
-        if pkg.slot_id != slot_id or pkg.is_deleted or not pkg.is_selectable:
+        if pkg.meal_type != slot.meal_type or pkg.is_deleted or not pkg.is_selectable:
             raise HTTPException(status_code=400, detail="部分菜品不可选或不属于当前时段")
 
     primary_package_id = sorted(package_ids)[0]
