@@ -30,7 +30,9 @@
       "Bash(python -m py_compile app/api/v1/admin.py app/api/v1/meals.py app/services/order_service.py app/services/meal_package_service.py)",
       "Bash(python -m py_compile app/api/v1/admin.py app/api/v1/meals.py app/services/order_service.py app/services/meal_package_service.py app/models/entities.py app/db/init_db.py)",
       "Bash(python -m py_compile app/api/v1/admin.py app/api/v1/meals.py app/services/order_service.py app/models/entities.py app/db/init_db.py app/schemas/admin_meal.py)",
-      "Bash(python -m py_compile backend/app/models/entities.py backend/app/db/init_db.py)"
+      "Bash(python -m py_compile backend/app/models/entities.py backend/app/db/init_db.py)",
+      "Bash(python -c \"import ast; [ast.parse\\(open\\(p, encoding='utf-8'\\).read\\(\\)\\) for p in ['backend/app/main.py','backend/app/db/init_db.py','backend/app/db/seed_data.py','backend/app/core/config.py']]; print\\('syntax OK'\\)\")",
+      "Bash(python -c \"import ast; [ast.parse\\(open\\(p, encoding='utf-8-sig'\\).read\\(\\)\\) for p in ['backend/app/main.py','backend/app/db/init_db.py','backend/app/db/seed_data.py','backend/app/core/config.py']]; print\\('syntax OK'\\)\")"
     ]
   }
 }

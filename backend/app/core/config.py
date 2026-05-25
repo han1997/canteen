@@ -15,8 +15,6 @@ class Settings(BaseSettings):
         "mysql+pymysql://canteen:change_me@127.0.0.1:3306/canteen_db?charset=utf8mb4"
     )
 
-    booking_seed_days: int = 14
-    booking_auto_open_days: int = 2
     default_meal_image_url: str = "/static/default-meal.png"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

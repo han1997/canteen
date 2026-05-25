@@ -56,8 +56,6 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY in .env}
       JWT_ALGORITHM: HS256
       JWT_EXPIRE_MINUTES: 480
-      BOOKING_SEED_DAYS: 14
-      BOOKING_AUTO_OPEN_DAYS: 2
       DEFAULT_MEAL_IMAGE_URL: /static/default-meal.png
       DATABASE_URL: mysql+pymysql://canteen:${MYSQL_PASSWORD}@db:3306/canteen_db?charset=utf8mb4
       TZ: Asia/Shanghai

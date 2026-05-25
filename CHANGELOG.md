@@ -4,6 +4,24 @@
 
 ## 2026-05-25
 
+### 调整：移除 slot 自动创建（每日定时任务 + 启动 seed），改为完全手动
+
+**动机**：之前后端有两条自动建 slot 的路径——启动时 `ensure_booking_slots()` 一次性补 14 天空 slot（今/明默认开放，其余关闭），并注册凌晨 00:01 的 asyncio 定时任务每日续 1 天。需求方反馈希望由管理员**完全**手动控制每天每餐次是否开放订餐，不再由后端代劳。
+
+**改动**：
+- `backend/app/main.py`：`lifespan` 只保留 `init_db()` 调用；删除 `asyncio.Event` / `asyncio.create_task(booking_window_scheduler(...))` 与对应的取消逻辑；连带删除 `import asyncio`、`from contextlib import suppress`、`from app.services.scheduler_service import booking_window_scheduler`。
+- `backend/app/services/scheduler_service.py`：整个文件删除（`booking_window_scheduler` 已无引用）。
+- `backend/app/db/init_db.py`：`init_db()` 末尾的 `ensure_booking_slots()` 调用移除；import 由 `from app.db.seed_data import ensure_booking_slots, seed_dev_users` 收窄为 `seed_dev_users`。
+- `backend/app/db/seed_data.py`：删除 `_ensure_slot` / `_seed_booking_slots` / `_find_seed_owner_id` / `ensure_booking_slots` / `maintain_booking_window` 五个函数；连带清理 `date/datetime/time/timedelta`、`IntegrityError`、`MealSlot`、`MealTypeEnum` 等不再使用的 import。文件现在只剩 `_ensure_user` + `seed_dev_users`。
+- `backend/app/core/config.py`：`Settings` 中删除 `booking_seed_days: int = 14`、`booking_auto_open_days: int = 2` 两项。
+- `backend/.env.example`、`docker-compose.yml`：同步删除 `BOOKING_SEED_DAYS=14`、`BOOKING_AUTO_OPEN_DAYS=2`。
+- `backend/README.md`：「开发环境自动初始化」段落改写——明确说明启动**不再创建任何 slot**，slot 由管理员在小程序「今日订餐开关」或 `POST /api/v1/admin/meal-slots` 手动创建并开启。
+
+**注意**：
+- 升级到本版本后，**已有数据库里的历史 slot 不会被清理**——之前已经自动播种的 14 天 slot 仍然保留，且其 `is_open` 状态由现有数据决定（管理员可以继续通过 PATCH 接口开关）。从今天起不再有新的自动 slot 生成。
+- 管理员手动创建 slot 的入口：小程序 `admin-meals` 顶部「今日订餐开关」（5/25 已上线）只能管今天；其他日期目前仍需后端 API `POST /api/v1/admin/meal-slots`，body 含 `meal_date` / `meal_type` / `is_open` / 可选 `booking_deadline`（不传默认当天 23:59:59）。后续若有"按周/按月批量开放"诉求，可再加一个批量入口。
+- 部署需重新构建后端镜像并 bump `docker-compose.yml` 的 `backend.image` tag；老镜像跑起来会继续按旧逻辑每日 00:01 创建 slot。
+
 ### 新增：菜品分类「自选菜」、admin-meals 顶部恢复"今日订餐开关"、隐藏订餐页备注栏
 **动机**：
 - 食堂菜品维护时除了"普通套餐 / 减脂套餐"还需要"自选菜"作为第三类标签。

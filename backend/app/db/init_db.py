@@ -1,6 +1,6 @@
 from sqlalchemy import inspect, text
 
-from app.db.seed_data import ensure_booking_slots, seed_dev_users
+from app.db.seed_data import seed_dev_users
 from app.db.session import engine
 from app.models import Base  # noqa: F401
 from app.models import entities  # noqa: F401
@@ -134,4 +134,3 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_legacy_columns()
     seed_dev_users()
-    ensure_booking_slots()
