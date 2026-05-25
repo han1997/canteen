@@ -52,6 +52,7 @@
       <view wx:if="{{slot.isBreakfast}}" class="breakfast-tip">早餐为单点，可多种叠加下单</view>
 
       <input
+        wx:if="{{false}}"
         class="input"
         placeholder="备注（可选，如：少盐）"
         data-slot-index="{{slotIndex}}"

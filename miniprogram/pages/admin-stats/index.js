@@ -17,7 +17,8 @@ const MEAL_TYPE_OPTIONS = [
 const CATEGORY_OPTIONS = [
   { label: "全部套餐", value: "all" },
   { label: "普通套餐", value: "normal" },
-  { label: "减脂套餐", value: "fat_loss" }
+  { label: "减脂套餐", value: "fat_loss" },
+  { label: "自选菜", value: "self_pick" }
 ];
 
 const MEAL_TYPE_LABEL_MAP = {

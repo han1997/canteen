@@ -16,6 +16,33 @@ def _ensure_column(table_name: str, column_name: str, ddl_sql: str) -> None:
         connection.execute(text(ddl_sql))
 
 
+def _ensure_enum_value(table_name: str, column_name: str, alter_sql: str) -> None:
+    """Idempotently extend an ENUM column. Reads information_schema.COLUMNS to
+    inspect the current ENUM definition; if all expected values from alter_sql
+    are already present, skip. alter_sql must be a full `ALTER TABLE ... MODIFY
+    COLUMN ... ENUM(...) ...` statement."""
+    import re
+
+    expected = re.findall(r"'([^']+)'", alter_sql)
+    if not expected:
+        return
+    with engine.connect() as connection:
+        row = connection.execute(
+            text(
+                "SELECT COLUMN_TYPE FROM information_schema.COLUMNS "
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c"
+            ),
+            {"t": table_name, "c": column_name},
+        ).first()
+    if row is None:
+        return
+    existing_values = set(re.findall(r"'([^']+)'", row[0] or ""))
+    if all(value in existing_values for value in expected):
+        return
+    with engine.begin() as connection:
+        connection.execute(text(alter_sql))
+
+
 def _migrate_meal_packages_to_template() -> None:
     """One-shot dev migration: switch meal_packages from per-slot to per-meal_type
     template. If slot_id column is still present, drops old FK/UK/column and
@@ -86,6 +113,21 @@ def _ensure_legacy_columns() -> None:
         "ALTER TABLE meal_packages ADD COLUMN is_deleted TINYINT(1) NOT NULL DEFAULT 0",
     )
     _migrate_meal_packages_to_template()
+    _ensure_enum_value(
+        "meal_packages",
+        "meal_category",
+        "ALTER TABLE meal_packages MODIFY COLUMN meal_category ENUM('normal','fat_loss','self_pick') NOT NULL",
+    )
+    _ensure_enum_value(
+        "orders",
+        "meal_category",
+        "ALTER TABLE orders MODIFY COLUMN meal_category ENUM('normal','fat_loss','self_pick') NOT NULL",
+    )
+    _ensure_enum_value(
+        "export_jobs",
+        "meal_category",
+        "ALTER TABLE export_jobs MODIFY COLUMN meal_category ENUM('normal','fat_loss','self_pick','all') NOT NULL DEFAULT 'all'",
+    )
 
 
 def init_db() -> None:

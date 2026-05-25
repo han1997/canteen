@@ -46,6 +46,7 @@ class MealTypeEnum(str, Enum):
 class MealCategoryEnum(str, Enum):
     NORMAL = "normal"
     FAT_LOSS = "fat_loss"
+    SELF_PICK = "self_pick"
 
 
 class OrderStatusEnum(str, Enum):

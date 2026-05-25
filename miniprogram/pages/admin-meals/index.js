@@ -1,6 +1,7 @@
 const api = require("../../services/api");
 const { withPullDownRefresh } = require("../../utils/pull-refresh");
 const { getApiBaseUrl } = require("../../config/env");
+const { todayString } = require("../../utils/date");
 
 const MANAGE_ROLES = ["kitchen", "admin", "super_admin"];
 const MEAL_TYPES = [
@@ -10,7 +11,8 @@ const MEAL_TYPES = [
 ];
 const CATEGORY_OPTIONS = [
   { label: "普通套餐", value: "normal" },
-  { label: "减脂套餐", value: "fat_loss" }
+  { label: "减脂套餐", value: "fat_loss" },
+  { label: "自选菜", value: "self_pick" }
 ];
 const DEFAULT_API_BASE_URL = getApiBaseUrl();
 const DEFAULT_MEAL_IMAGE_LOCAL = "/assets/default-meal.png";
@@ -135,7 +137,13 @@ Page({
       lunch: emptyDraft(),
       dinner: emptyDraft()
     },
-    categoryLabels: CATEGORY_OPTIONS.map((item) => item.label)
+    categoryLabels: CATEGORY_OPTIONS.map((item) => item.label),
+    todayDate: todayString(),
+    todaySlotChips: [
+      { mealType: "breakfast", label: "早餐", isOpen: false, slotId: null },
+      { mealType: "lunch", label: "中餐", isOpen: false, slotId: null },
+      { mealType: "dinner", label: "晚餐", isOpen: false, slotId: null }
+    ]
   },
 
   async onShow() {
@@ -147,6 +155,7 @@ Page({
     await this.ensureAccess();
     if (this.data.allowed) {
       await this.loadPackages();
+      await this.loadTodaySlots();
     }
   },
 
@@ -155,6 +164,7 @@ Page({
       await this.ensureAccess();
       if (this.data.allowed) {
         await this.loadPackages();
+        await this.loadTodaySlots();
       }
     },
     { guard() { return !!this._pickingImage; } }
@@ -184,6 +194,56 @@ Page({
 
   activeMealType() {
     return MEAL_TYPES[this.data.activeIndex].value;
+  },
+
+  async loadTodaySlots() {
+    try {
+      const slots = await api.getAdminMealSlots(this.data.todayDate);
+      const slotByType = {};
+      (slots || []).forEach((slot) => {
+        slotByType[slot.meal_type] = slot;
+      });
+      const chips = this.data.todaySlotChips.map((chip) => {
+        const slot = slotByType[chip.mealType];
+        return {
+          ...chip,
+          isOpen: !!(slot && slot.is_open),
+          slotId: slot ? slot.id : null
+        };
+      });
+      this.setData({ todaySlotChips: chips });
+    } catch (err) {
+      // 静默失败：今日时段开关不可用不影响菜品管理主功能
+    }
+  },
+
+  async onToggleTodaySlot(e) {
+    const mealType = e.currentTarget.dataset.mealType;
+    const isOpen = !!e.detail.value;
+    const chipIndex = this.data.todaySlotChips.findIndex((c) => c.mealType === mealType);
+    if (chipIndex < 0) {
+      return;
+    }
+    const chip = this.data.todaySlotChips[chipIndex];
+
+    try {
+      if (chip.slotId) {
+        await api.updateAdminMealSlotStatus(chip.slotId, isOpen);
+      } else {
+        // 今日还没有这餐次的 slot，先创建并直接设为期望状态
+        await api.createOrUpdateAdminMealSlot({
+          meal_date: this.data.todayDate,
+          meal_type: mealType,
+          is_open: isOpen
+        });
+      }
+      toast(isOpen ? "已开放订餐" : "已停止订餐", "success");
+      await this.loadTodaySlots();
+    } catch (err) {
+      toast(err.message || "更新时段状态失败");
+      // 回退 UI 到服务端真实状态
+      await this.loadTodaySlots();
+    }
   },
 
   async loadPackages() {

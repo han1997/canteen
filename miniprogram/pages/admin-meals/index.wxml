@@ -13,6 +13,21 @@
         </view>
         <button class="subtle-btn ghost-btn" size="mini" bindtap="logout">退出登录</button>
       </view>
+      <view class="today-slots">
+        <view class="today-slots-title">
+          <text class="muted">今日订餐开关</text>
+          <text class="muted today-slots-date">{{todayDate}}</text>
+        </view>
+        <view class="today-slots-grid">
+          <view wx:for="{{todaySlotChips}}" wx:key="mealType" class="today-slot-chip {{item.isOpen ? 'today-slot-on' : 'today-slot-off'}}">
+            <view class="today-slot-info">
+              <text class="today-slot-label">{{item.label}}</text>
+              <text class="today-slot-status">{{item.isOpen ? '开放中' : '已停止'}}</text>
+            </view>
+            <switch class="today-slot-switch" checked="{{item.isOpen}}" data-meal-type="{{item.mealType}}" bindchange="onToggleTodaySlot" />
+          </view>
+        </view>
+      </view>
       <view class="meal-tabs">
         <view
           wx:for="{{mealTypes}}"

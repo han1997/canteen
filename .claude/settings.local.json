@@ -29,7 +29,8 @@
       "Bash(git stash *)",
       "Bash(python -m py_compile app/api/v1/admin.py app/api/v1/meals.py app/services/order_service.py app/services/meal_package_service.py)",
       "Bash(python -m py_compile app/api/v1/admin.py app/api/v1/meals.py app/services/order_service.py app/services/meal_package_service.py app/models/entities.py app/db/init_db.py)",
-      "Bash(python -m py_compile app/api/v1/admin.py app/api/v1/meals.py app/services/order_service.py app/models/entities.py app/db/init_db.py app/schemas/admin_meal.py)"
+      "Bash(python -m py_compile app/api/v1/admin.py app/api/v1/meals.py app/services/order_service.py app/models/entities.py app/db/init_db.py app/schemas/admin_meal.py)",
+      "Bash(python -m py_compile backend/app/models/entities.py backend/app/db/init_db.py)"
     ]
   }
 }

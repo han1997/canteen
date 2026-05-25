@@ -49,6 +49,75 @@
   gap: 10rpx;
 }
 
+.today-slots {
+  margin-top: 18rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1rpx solid #d6e4f7;
+}
+
+.today-slots-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10rpx;
+}
+
+.today-slots-date {
+  font-size: 22rpx;
+}
+
+.today-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10rpx;
+}
+
+.today-slot-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8rpx;
+  padding: 8rpx 12rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid #d3def0;
+  background: #f4f7fc;
+}
+
+.today-slot-on {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border-color: #86efac;
+}
+
+.today-slot-off {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border-color: #fca5a5;
+}
+
+.today-slot-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.today-slot-label {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #0b2a4a;
+}
+
+.today-slot-status {
+  font-size: 20rpx;
+  color: #475569;
+}
+
+.today-slot-switch {
+  transform: scale(0.7);
+  transform-origin: right center;
+  flex: 0 0 auto;
+}
+
 .meal-tab {
   height: 64rpx;
   line-height: 64rpx;

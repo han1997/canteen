@@ -2,6 +2,33 @@
 
 本仓库的变更日志，每次代码修改后追加。日期为本地时区（Asia/Shanghai）。
 
+## 2026-05-25
+
+### 新增：菜品分类「自选菜」、admin-meals 顶部恢复"今日订餐开关"、隐藏订餐页备注栏
+**动机**：
+- 食堂菜品维护时除了"普通套餐 / 减脂套餐"还需要"自选菜"作为第三类标签。
+- 之前 admin-meals 是按 slot 列表渲染的，每个 slot 自带「开放/停止订餐」开关；5/22 改成按 meal_type 模板后那个开关被一并删掉，食堂人员失去了"现场关掉某餐订餐通道"的能力。
+- 订餐页菜品卡上方那条「备注（可选，如：少盐）」输入框暂时不需要，先隐藏。
+
+**改动**：
+- 后端 enum：`backend/app/models/entities.py` 中 `MealCategoryEnum` 增加 `SELF_PICK = "self_pick"`。
+- 后端 schema：`backend/sql/schema.sql` 中 `meal_packages.meal_category` / `orders.meal_category` 的 ENUM 增加 `'self_pick'`；`export_jobs.meal_category` 同步增加（仍保留 `'all'`）。
+- 后端迁移：`backend/app/db/init_db.py` 新增 `_ensure_enum_value(table, column, alter_sql)` 幂等工具——读 `information_schema.COLUMNS.COLUMN_TYPE` 解析现有 ENUM 值集合，全部覆盖则跳过、否则执行 `ALTER TABLE ... MODIFY COLUMN ... ENUM(...)`。在 `_ensure_legacy_columns` 末尾追加三次调用，把已部署库的三个 ENUM 列升级到含 `self_pick`。
+- 前端常量与选项：
+  - `miniprogram/utils/constants.js`：新增 `SELF_PICK = "self_pick"`、`CATEGORY_LABEL.self_pick = "自选菜"`。
+  - `miniprogram/pages/admin-meals/index.js`：`CATEGORY_OPTIONS` 增加自选菜，picker 多一项可选。
+  - `miniprogram/pages/admin-stats/index.js`：统计过滤的 `CATEGORY_OPTIONS` 也同步加上，便于按自选菜过滤。
+- 今日订餐开关（admin-meals）：
+  - `index.js`：`data` 新增 `todayDate`、`todaySlotChips` 三项（早/中/晚）。`loadTodaySlots()` 调 `api.getAdminMealSlots(todayString())`，按 `meal_type` 索引并合并到 chips；onShow 与 onPullDownRefresh 末尾追加调用。`onToggleTodaySlot(e)` 处理开关变更：若该餐次今日 slot 已存在则 `updateAdminMealSlotStatus`；否则 `createOrUpdateAdminMealSlot` 创建并直接设为期望状态。失败回滚 UI。
+  - `index.wxml`：在 hero-card 内 `.hero-head` 下方、`.meal-tabs` 上方插入 `.today-slots` 块：标题行「今日订餐开关 + 日期」 + 3 列 grid 的开关 chip。
+  - `index.wxss`：新增 `.today-slots*` 样式；开/关分别用绿色/橙色背景区分；switch 用 `transform: scale(0.7)` 缩到合适尺寸。
+- 隐藏订餐页备注：`miniprogram/pages/home/index.wxml` 中订餐页菜品卡上方的备注 input 加 `wx:if="{{false}}"` 隐藏，保留代码以便后续恢复；对应 `onNoteInput` handler 保留不动。
+
+**注意**：
+- "今日订餐开关"操作的是**今天**的 slot；若需关闭明天某餐次，仍需用后端 API（小程序 UI 暂未提供）。
+- 新增的 `_ensure_enum_value` 通过解析 `COLUMN_TYPE` 字符串做幂等判断，对 ENUM 顺序不敏感，对值名严格匹配；后续若再加新枚举值，直接复制现有调用即可。
+- 备注栏只是 wxml 层 `wx:if="{{false}}"`，`onNoteInput` 仍在 page 上、提交订单时 `note` 字段仍按 `slot.note` 传给后端（默认空字符串）；如果要彻底删除可后续清理。
+
 ## 2026-05-22
 
 ### 调整：UI 排版打磨
