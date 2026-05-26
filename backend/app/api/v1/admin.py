@@ -103,9 +103,21 @@ def _build_meal_package_out(pkg: MealPackage) -> AdminMealPackageOut:
     )
 
 
-def _generate_package_code(meal_type: str) -> str:
-    prefix = {"breakfast": "BF", "lunch": "LU", "dinner": "DI"}.get(meal_type, "PK")
-    return f"{prefix}{uuid4().hex[:8].upper()}"
+def _generate_package_code(meal_type: str | None = None) -> str:
+    # 使用通用前缀 MP（Meal Package），不再依赖单一餐别
+    return f"MP{uuid4().hex[:8].upper()}"
+
+
+def _load_package_with_relations(db: Session, package_id: int) -> MealPackage | None:
+    """加载菜品并预加载 items 和 meal_type_associations，避免懒加载 N+1。"""
+    return db.scalar(
+        select(MealPackage)
+        .options(
+            joinedload(MealPackage.items),
+            joinedload(MealPackage.meal_type_associations),
+        )
+        .where(MealPackage.id == package_id)
+    )
 
 
 def _validate_police_no(police_no: str | None) -> bool:
@@ -527,8 +539,8 @@ def create_meal_package(
 
     meal_category_enum = MealCategoryEnum(payload.meal_category)
 
-    # 生成 package_code（使用第一个餐别作为前缀）
-    package_code = payload.package_code or _generate_package_code(payload.meal_types[0])
+    # 生成 package_code（不再依赖餐别，使用通用 MP 前缀）
+    package_code = payload.package_code or _generate_package_code()
 
     # 检查 package_code 是否已存在
     existing = db.scalar(
@@ -577,7 +589,8 @@ def create_meal_package(
         request_ip=request.client.host if request.client else None,
     )
     db.commit()
-    db.refresh(pkg)
+    # 重新查询带预加载，避免懒加载 N+1
+    pkg = _load_package_with_relations(db, pkg.id)
     return _build_meal_package_out(pkg)
 
 
@@ -683,7 +696,7 @@ async def bulk_import_meal_packages(
                 skipped += 1
                 continue
 
-            package_code = _generate_package_code(meal_types[0])
+            package_code = _generate_package_code()
 
             max_sort = db.scalar(
                 select(func.max(MealPackage.sort_order)).where(MealPackage.is_deleted == False)
@@ -745,32 +758,35 @@ def update_meal_package(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    pkg = db.get(MealPackage, package_id)
+    # 预加载 meal_type_associations，便于后续 diff 更新
+    pkg = _load_package_with_relations(db, package_id)
     if not pkg or pkg.is_deleted:
         raise HTTPException(status_code=404, detail="菜品不存在")
 
-    # 更新餐别关联
+    # 更新餐别关联（diff 模式：只删除待移除的、只添加新增的）
     if payload.meal_types is not None:
         # 验证餐别
-        meal_type_enums = []
+        new_meal_types: set[MealTypeEnum] = set()
         for mt in payload.meal_types:
             try:
-                meal_type_enums.append(MealTypeEnum(mt))
+                new_meal_types.add(MealTypeEnum(mt))
             except ValueError:
                 raise HTTPException(status_code=400, detail=f"无效的餐别: {mt}")
 
-        # 删除旧关联
-        db.query(MealPackageMealType).filter(
-            MealPackageMealType.package_id == package_id
-        ).delete()
+        # 计算 diff
+        current_assocs = {assoc.meal_type: assoc for assoc in pkg.meal_type_associations}
+        current_meal_types = set(current_assocs.keys())
 
-        # 创建新关联
-        for meal_type_enum in meal_type_enums:
-            assoc = MealPackageMealType(
-                package_id=pkg.id,
-                meal_type=meal_type_enum
-            )
-            db.add(assoc)
+        to_remove = current_meal_types - new_meal_types
+        to_add = new_meal_types - current_meal_types
+
+        # 只删除待移除的关联
+        for mt in to_remove:
+            db.delete(current_assocs[mt])
+
+        # 只添加新增的关联
+        for mt in to_add:
+            db.add(MealPackageMealType(package_id=pkg.id, meal_type=mt))
 
     if payload.package_name is not None:
         pkg.package_name = payload.package_name
@@ -800,7 +816,8 @@ def update_meal_package(
         request_ip=request.client.host if request.client else None,
     )
     db.commit()
-    db.refresh(pkg)
+    # 重新查询带预加载，避免懒加载 N+1
+    pkg = _load_package_with_relations(db, pkg.id)
     return _build_meal_package_out(pkg)
 
 
@@ -836,7 +853,8 @@ def delete_meal_package(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    pkg = db.get(MealPackage, package_id)
+    # 预加载关联，审计日志需要 meal_types
+    pkg = _load_package_with_relations(db, package_id)
     if not pkg or pkg.is_deleted:
         raise HTTPException(status_code=404, detail="菜品不存在")
 

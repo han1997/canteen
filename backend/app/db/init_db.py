@@ -187,7 +187,12 @@ def _relax_meal_slots_booking_deadline() -> None:
 def _migrate_meal_packages_to_multi_meal_types() -> None:
     """One-shot migration: switch meal_packages from single meal_type column to
     multi-meal-types association table. Migrates existing data, drops old column
-    and constraint. Idempotent."""
+    and constraint. Idempotent.
+
+    注意：MySQL DDL（ALTER TABLE）会隐式提交事务，因此无法做到真正的"全或无"
+    回滚。本函数将所有 DDL 操作集中在一个 with 块中以提高代码可读性，并通过幂等
+    检查保证可重复执行。
+    """
     inspector = inspect(engine)
     if "meal_packages" not in inspector.get_table_names():
         return
@@ -195,7 +200,7 @@ def _migrate_meal_packages_to_multi_meal_types() -> None:
     columns = {column["name"] for column in inspector.get_columns("meal_packages")}
     has_meal_type = "meal_type" in columns
 
-    # Ensure association table exists
+    # 确保关联表存在
     if "meal_package_meal_types" not in inspector.get_table_names():
         with engine.begin() as connection:
             connection.execute(text("""
@@ -211,35 +216,35 @@ def _migrate_meal_packages_to_multi_meal_types() -> None:
                 ) ENGINE=InnoDB COMMENT='菜品-餐别多对多关联表'
             """))
 
-    # Migrate data from old meal_type column to association table
-    if has_meal_type:
-        with engine.begin() as connection:
-            # 检查是否已经迁移过
-            count = connection.execute(
-                text("SELECT COUNT(*) FROM meal_package_meal_types")
-            ).scalar()
-            if count == 0:
-                connection.execute(text("""
-                    INSERT INTO meal_package_meal_types (package_id, meal_type)
-                    SELECT id, meal_type FROM meal_packages WHERE is_deleted = 0
-                """))
+    # 如果还有旧的 meal_type 列，执行数据迁移和约束调整
+    if not has_meal_type:
+        return
 
-        # 删除旧的唯一约束 uk_meal_packages_type_code
-        index_names = {idx["name"] for idx in inspector.get_indexes("meal_packages")}
+    # 重新读取索引信息（关联表可能刚创建）
+    inspector = inspect(engine)
+    index_names = {idx["name"] for idx in inspector.get_indexes("meal_packages")}
+
+    with engine.begin() as connection:
+        # 1. 迁移数据：仅在关联表为空时执行
+        count = connection.execute(
+            text("SELECT COUNT(*) FROM meal_package_meal_types")
+        ).scalar()
+        if count == 0:
+            connection.execute(text("""
+                INSERT INTO meal_package_meal_types (package_id, meal_type)
+                SELECT id, meal_type FROM meal_packages WHERE is_deleted = 0
+            """))
+
+        # 2. 删除旧的唯一约束
         if "uk_meal_packages_type_code" in index_names:
-            with engine.begin() as connection:
-                connection.execute(text("ALTER TABLE meal_packages DROP INDEX uk_meal_packages_type_code"))
+            connection.execute(text("ALTER TABLE meal_packages DROP INDEX uk_meal_packages_type_code"))
 
-        # 添加新的唯一约束 uk_meal_packages_code（如果还没有的话）
-        inspector_refreshed = inspect(engine)
-        index_names_refreshed = {idx["name"] for idx in inspector_refreshed.get_indexes("meal_packages")}
-        if "uk_meal_packages_code" not in index_names_refreshed:
-            with engine.begin() as connection:
-                connection.execute(text("ALTER TABLE meal_packages ADD UNIQUE KEY uk_meal_packages_code (package_code)"))
+        # 3. 添加新的唯一约束
+        if "uk_meal_packages_code" not in index_names:
+            connection.execute(text("ALTER TABLE meal_packages ADD UNIQUE KEY uk_meal_packages_code (package_code)"))
 
-        # 将 meal_type 改为可空（暂时保留作为备份，后续迭代可删除）
-        with engine.begin() as connection:
-            connection.execute(text("ALTER TABLE meal_packages MODIFY COLUMN meal_type ENUM('breakfast','lunch','dinner') NULL"))
+        # 4. 将 meal_type 改为可空（暂时保留作为备份，后续迭代可删除）
+        connection.execute(text("ALTER TABLE meal_packages MODIFY COLUMN meal_type ENUM('breakfast','lunch','dinner') NULL"))
 
 
 def init_db() -> None:

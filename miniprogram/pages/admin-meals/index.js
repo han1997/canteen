@@ -13,12 +13,6 @@ const CATEGORY_OPTIONS = [
   { label: "减脂套餐", value: "fat_loss" },
   { label: "自选菜", value: "self_pick" }
 ];
-// 餐别多选选项（用于编辑时）
-const MEAL_TYPE_MULTI_OPTIONS = [
-  { label: "早餐", value: "breakfast" },
-  { label: "中餐", value: "lunch" },
-  { label: "晚餐", value: "dinner" }
-];
 const DEFAULT_API_BASE_URL = getApiBaseUrl();
 const DEFAULT_MEAL_IMAGE_LOCAL = "/assets/default-meal.png";
 const DEFAULT_MEAL_IMAGE_URL = "/static/default-meal.png";

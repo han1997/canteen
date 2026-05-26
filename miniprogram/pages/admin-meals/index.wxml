@@ -65,6 +65,7 @@
             <view class="pkg-top">
               <image class="meal-image" src="{{pkg.imagePreviewUrl}}" mode="aspectFill" lazy-load="true" />
               <view class="pkg-fields">
+                <view wx:if="{{pkg.mealTypeLabel}}" class="meal-type-badge">{{pkg.mealTypeLabel}}</view>
                 <input
                   class="input compact-input"
                   placeholder="菜品名称"

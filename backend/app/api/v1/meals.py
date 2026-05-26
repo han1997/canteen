@@ -33,21 +33,22 @@ def list_slots(
 
     meal_types = {slot.meal_type for slot in slots}
 
-    # 通过关联表查询每个餐别对应的菜品
+    # 单次查询所有菜品 + 关联餐别，再在内存中按餐别分组
+    rows = db.execute(
+        select(MealPackage, MealPackageMealType.meal_type)
+        .join(MealPackageMealType, MealPackageMealType.package_id == MealPackage.id)
+        .where(
+            MealPackageMealType.meal_type.in_(meal_types),
+            MealPackage.is_deleted.is_(False),
+            MealPackage.is_selectable.is_(True),
+        )
+        .options(joinedload(MealPackage.items))
+        .order_by(MealPackage.sort_order)
+    ).unique().all()
+
     pkgs_by_type: dict[MealTypeEnum, list[MealPackage]] = defaultdict(list)
-    for mt in meal_types:
-        pkgs = db.scalars(
-            select(MealPackage)
-            .join(MealPackageMealType, MealPackageMealType.package_id == MealPackage.id)
-            .where(
-                MealPackageMealType.meal_type == mt,
-                MealPackage.is_deleted.is_(False),
-                MealPackage.is_selectable.is_(True),
-            )
-            .options(joinedload(MealPackage.items))
-            .order_by(MealPackage.sort_order)
-        ).unique().all()
-        pkgs_by_type[mt] = pkgs
+    for pkg, mt in rows:
+        pkgs_by_type[mt].append(pkg)
 
     result: list[MealSlotOut] = []
     for slot in slots:

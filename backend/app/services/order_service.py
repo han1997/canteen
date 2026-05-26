@@ -3,7 +3,7 @@ from random import randint
 
 from fastapi import HTTPException
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models import MealPackage, MealSlot, Order, OrderItem, OrderStatusEnum
 
@@ -49,8 +49,10 @@ def create_or_replace_order(
 
     package_ids = list(quantity_by_package.keys())
     package_list = db.scalars(
-        select(MealPackage).where(MealPackage.id.in_(package_ids), MealPackage.is_deleted.is_(False))
-    ).all()
+        select(MealPackage)
+        .options(joinedload(MealPackage.meal_type_associations))
+        .where(MealPackage.id.in_(package_ids), MealPackage.is_deleted.is_(False))
+    ).unique().all()
     package_map = {pkg.id: pkg for pkg in package_list}
     if len(package_map) != len(package_ids):
         raise HTTPException(status_code=400, detail="部分菜品不存在")

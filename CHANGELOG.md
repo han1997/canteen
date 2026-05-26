@@ -4,6 +4,58 @@
 
 ## 2026-05-26
 
+### 代码审查修复：性能优化与 UX 改进
+
+**动机**：
+- 代码审查发现多餐别重构存在 N+1 查询风险和小处问题，需修复后再部署。
+
+**修复内容**：
+
+1. **N+1 查询优化**：
+   - `backend/app/api/v1/meals.py`：将循环查询每个 meal_type 改为单次 JOIN 查询 + 内存分组（select tuple + defaultdict 分组）
+   - `backend/app/services/order_service.py`：查询 package_list 时增加 `joinedload(MealPackage.meal_type_associations)`，避免后续 `pkg.meal_types not in` 检查触发懒加载
+   - `backend/app/api/v1/admin.py`：新增辅助函数 `_load_package_with_relations(db, package_id)` 一次性预加载 `items` 和 `meal_type_associations`；替换 `create_meal_package` / `update_meal_package` / `delete_meal_package` 中的 `db.get()` + `db.refresh()` 调用
+
+2. **update_meal_package 改用 diff 模式**：
+   - 原逻辑：先 `db.query(MealPackageMealType).filter(...).delete()` 全删，再循环 add
+   - 新逻辑：计算 `to_remove = current - new` 和 `to_add = new - current`，只操作变化的关联
+   - 优点：减少 DB 写入，session 中残留对象更少，cascade delete-orphan 行为更可预期
+
+3. **package_code 前缀通用化**：
+   - 原：根据 `meal_type` 用 `BF` / `LU` / `DI` 前缀
+   - 新：统一用 `MP`（Meal Package）前缀，多餐别菜品不再有歧义
+   - `_generate_package_code()` 参数改为可选（暂保留向后兼容签名）
+
+4. **init_db 迁移函数事务边界优化**：
+   - 原：4 个独立 `with engine.begin()` 事务
+   - 新：合并到单个事务（MySQL DDL 仍会隐式提交，但代码意图更清晰）
+   - 添加文档说明 MySQL DDL 无法回滚的限制
+
+5. **小程序 UX 改进**：
+   - 菜品卡片显示「适用餐别」徽章（如「午晚餐」、「中餐」），避免用户误操作
+   - 删除未使用的 `MEAL_TYPE_MULTI_OPTIONS` 常量
+   - 新增 `.meal-type-badge` 样式（蓝色徽章，左上角显示）
+
+**技术细节**：
+- 修改文件：
+  - `backend/app/api/v1/admin.py`（新增 `_load_package_with_relations`，重构 4 处查询）
+  - `backend/app/api/v1/meals.py`（N+1 → 单次 JOIN）
+  - `backend/app/services/order_service.py`（增加 joinedload）
+  - `backend/app/db/init_db.py`（合并迁移事务）
+  - `miniprogram/pages/admin-meals/index.js`（删除未用常量）
+  - `miniprogram/pages/admin-meals/index.wxml`（菜品卡片显示徽章）
+  - `miniprogram/pages/admin-meals/index.wxss`（新增徽章样式）
+
+**影响**：
+- 用户端 `/meals/slots` 接口查询数降低（一天 3 个时段从 3 次查询降为 1 次）
+- 订餐验证不再触发懒加载
+- 菜品 CRUD 响应不依赖 SQLAlchemy 懒加载机制
+- 管理员一眼能看出每个菜品适用的餐别
+
+---
+
+## 2026-05-26
+
 ### 整理：合并 SQL 文件为单一初始化脚本
 
 **动机**：
