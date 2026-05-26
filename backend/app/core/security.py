@@ -37,8 +37,13 @@ def create_access_token(subject: str) -> str:
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def _fetch_user_by_police_no(db: Session, police_no: str) -> User | None:
-    stmt = select(User).where(User.police_no == police_no)
+def _fetch_user_for_token(db: Session, subject: str) -> User | None:
+    # New tokens carry user.id (numeric string); legacy tokens still carry police_no.
+    if subject.isdigit():
+        user = db.get(User, int(subject))
+        if user:
+            return user
+    stmt = select(User).where(User.police_no == subject)
     return db.scalar(stmt)
 
 
@@ -52,13 +57,13 @@ def get_current_user(
     )
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
-        police_no = payload.get("sub")
-        if not police_no:
+        subject = payload.get("sub")
+        if not subject:
             raise auth_error
     except JWTError as exc:
         raise auth_error from exc
 
-    user = _fetch_user_by_police_no(db, police_no)
+    user = _fetch_user_for_token(db, str(subject))
     if not user or user.status != UserStatusEnum.ACTIVE:
         raise auth_error
 

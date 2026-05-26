@@ -1,11 +1,14 @@
+import re
 from datetime import date, datetime, time
+from io import BytesIO
 from pathlib import Path
 from random import randint
 from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
-from sqlalchemy import case, func, select
+from openpyxl import load_workbook
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -26,13 +29,13 @@ from app.models import (
     UserStatusEnum,
 )
 from app.schemas.admin import (
+    AdminBulkImportResult,
     AdminUserCreateRequest,
     AdminUserOut,
     AdminUserRoleUpdateRequest,
     AdminUserStatusUpdateRequest,
 )
 from app.schemas.admin_meal import (
-    AdminMealItemOut,
     AdminMealPackageCreateRequest,
     AdminMealPackageOut,
     AdminMealPackageUpdateRequest,
@@ -50,46 +53,37 @@ USER_MANAGE_DEPS = [Depends(role_required(RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN))
 MEAL_MANAGE_DEPS = [Depends(role_required(RoleEnum.KITCHEN, RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN))]
 
 
-def _query_lunch_dinner_package_stats(
-    db: Session,
-    *,
-    from_date: date,
-    to_date: date,
-) -> list[dict]:
-    stmt = (
-        select(
-            MealSlot.meal_type.label("meal_type"),
-            OrderItem.item_name.label("package_name"),
-            func.sum(OrderItem.quantity).label("total_quantity"),
-        )
-        .select_from(Order)
-        .join(MealSlot, MealSlot.id == Order.slot_id)
-        .join(OrderItem, OrderItem.order_id == Order.id)
-        .where(
-            MealSlot.meal_date >= from_date,
-            MealSlot.meal_date <= to_date,
-            MealSlot.meal_type.in_((MealTypeEnum.LUNCH, MealTypeEnum.DINNER)),
-            Order.status != OrderStatusEnum.CANCELLED,
-        )
-        .group_by(MealSlot.meal_type, OrderItem.item_name)
-        .order_by(MealSlot.meal_type.asc(), func.sum(OrderItem.quantity).desc(), OrderItem.item_name.asc())
-    )
-    rows = db.execute(stmt).all()
-
-    result: list[dict] = []
-    for row in rows:
-        meal_type = row.meal_type.value if hasattr(row.meal_type, "value") else str(row.meal_type)
-        result.append(
-            {
-                "meal_type": meal_type,
-                "package_name": row.package_name,
-                "total_quantity": float(row.total_quantity or 0),
-            }
-        )
-    return result
+class DashboardStats:
+    def __init__(
+        self,
+        target_date: date,
+        breakfast_count: int,
+        lunch_count: int,
+        dinner_count: int,
+        breakfast_open: bool,
+        lunch_open: bool,
+        dinner_open: bool,
+    ):
+        self.target_date = target_date
+        self.breakfast_count = breakfast_count
+        self.lunch_count = lunch_count
+        self.dinner_count = dinner_count
+        self.breakfast_open = breakfast_open
+        self.lunch_open = lunch_open
+        self.dinner_open = dinner_open
 
 
-def _to_meal_package_out(pkg: MealPackage) -> AdminMealPackageOut:
+def _build_meal_package_out(pkg: MealPackage) -> AdminMealPackageOut:
+    items = [
+        {
+            "id": item.id,
+            "item_name": item.item_name,
+            "quantity": float(item.quantity),
+            "unit": item.unit,
+            "item_type": item.item_type,
+        }
+        for item in sorted(pkg.items, key=lambda x: x.sort_order)
+    ]
     return AdminMealPackageOut(
         id=pkg.id,
         meal_type=pkg.meal_type.value,
@@ -97,89 +91,34 @@ def _to_meal_package_out(pkg: MealPackage) -> AdminMealPackageOut:
         package_name=pkg.package_name,
         meal_category=pkg.meal_category.value,
         is_selectable=pkg.is_selectable,
-        image_url=pkg.image_url or settings.default_meal_image_url,
+        image_url=pkg.image_url or "",
         price=float(pkg.price) if pkg.price is not None else None,
         calories=pkg.calories,
         protein_g=float(pkg.protein_g) if pkg.protein_g is not None else None,
         carbs_g=float(pkg.carbs_g) if pkg.carbs_g is not None else None,
         fat_g=float(pkg.fat_g) if pkg.fat_g is not None else None,
         sort_order=pkg.sort_order,
-        items=[
-            AdminMealItemOut(
-                id=item.id,
-                item_name=item.item_name,
-                quantity=float(item.quantity),
-                unit=item.unit,
-                item_type=item.item_type,
-            )
-            for item in sorted(pkg.items, key=lambda value: value.sort_order)
-        ],
+        items=items,
     )
 
 
-def _to_meal_slot_out(slot: MealSlot) -> AdminMealSlotOut:
-    return AdminMealSlotOut(
-        id=slot.id,
-        meal_date=slot.meal_date,
-        meal_type=slot.meal_type.value,
-        booking_deadline=slot.booking_deadline,
-        is_open=slot.is_open,
-    )
+def _generate_package_code(meal_type: str) -> str:
+    prefix = {"breakfast": "BF", "lunch": "LU", "dinner": "DI"}.get(meal_type, "PK")
+    return f"{prefix}{uuid4().hex[:8].upper()}"
 
 
-def _default_deadline(meal_date: date) -> datetime:
-    return datetime.combine(meal_date, time(23, 59, 59))
+def _validate_police_no(police_no: str | None) -> bool:
+    """验证警号格式：非空且长度在2-32之间"""
+    if not police_no:
+        return True  # None is valid (optional field)
+    return 2 <= len(police_no) <= 32
 
 
-def _generate_package_code() -> str:
-    return f"pkg{datetime.utcnow().strftime('%H%M%S')}{randint(100, 999)}"
-
-
-def _package_code_exists(db: Session, meal_type: MealTypeEnum, package_code: str) -> bool:
-    return db.scalar(
-        select(MealPackage.id).where(MealPackage.meal_type == meal_type, MealPackage.package_code == package_code)
-    ) is not None
-
-
-def _pick_available_package_code(
-    db: Session, meal_type: MealTypeEnum, preferred_code: str | None = None
-) -> str:
-    if preferred_code and not _package_code_exists(db, meal_type, preferred_code):
-        return preferred_code
-
-    for _ in range(10):
-        candidate = _generate_package_code()
-        if not _package_code_exists(db, meal_type, candidate):
-            return candidate
-
-    raise HTTPException(status_code=409, detail="套餐编码冲突，请重试")
-
-
-def _is_slot_package_code_conflict(exc: IntegrityError) -> bool:
-    message = str(exc.orig) if exc.orig is not None else str(exc)
-    return "uk_meal_packages_type_code" in message
-
-
-def _normalize_image_ext(content_type: str, filename: str | None) -> str:
-    mapping = {
-        "image/jpeg": ".jpg",
-        "image/png": ".png",
-        "image/webp": ".webp",
-    }
-    if content_type in mapping:
-        return mapping[content_type]
-    if filename and "." in filename:
-        ext = Path(filename).suffix.lower()
-        if ext in {".jpg", ".jpeg", ".png", ".webp"}:
-            return ".jpg" if ext == ".jpeg" else ext
-    raise HTTPException(status_code=400, detail="仅支持 jpg/png/webp 图片")
-
-
-def _load_slot(db: Session, slot_id: int) -> MealSlot:
-    slot = db.scalar(select(MealSlot).where(MealSlot.id == slot_id))
-    if not slot:
-        raise HTTPException(status_code=404, detail="订餐时段不存在")
-    return slot
+def _validate_mobile(mobile: str | None) -> bool:
+    """验证手机号格式：11位数字"""
+    if not mobile:
+        return True  # None is valid (optional field)
+    return bool(re.match(r"^1\d{10}$", mobile))
 
 
 @router.get("/users", response_model=list[AdminUserOut], dependencies=USER_MANAGE_DEPS)
@@ -191,7 +130,11 @@ def list_users(
     _ = current_user
     stmt = select(User)
     if keyword:
-        stmt = stmt.where((User.police_no.like(f"%{keyword}%")) | (User.real_name.like(f"%{keyword}%")))
+        stmt = stmt.where(
+            (User.police_no.like(f"%{keyword}%"))
+            | (User.real_name.like(f"%{keyword}%"))
+            | (User.mobile.like(f"%{keyword}%"))
+        )
     return db.scalars(stmt.order_by(User.id.desc())).all()
 
 
@@ -202,9 +145,12 @@ def create_user(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    exists = db.scalar(select(User).where(User.police_no == payload.police_no))
-    if exists:
-        raise HTTPException(status_code=400, detail="警号已存在")
+    if payload.police_no:
+        if db.scalar(select(User).where(User.police_no == payload.police_no)):
+            raise HTTPException(status_code=400, detail="警号已存在")
+    if payload.mobile:
+        if db.scalar(select(User).where(User.mobile == payload.mobile)):
+            raise HTTPException(status_code=400, detail="手机号已存在")
 
     user = User(
         police_no=payload.police_no,
@@ -231,6 +177,144 @@ def create_user(
     return user
 
 
+@router.post("/users/bulk-import", response_model=AdminBulkImportResult, dependencies=USER_MANAGE_DEPS)
+async def bulk_import_users(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """批量导入就餐人员。Excel 表头：警号 / 姓名 / 手机号（警号与手机号至少填一个）。
+    默认密码 123456，角色 officer，部门 祁门县公安局。
+    限制：文件最大 10MB，最多 1000 行数据。"""
+    if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
+
+    content = await file.read()
+    if len(content) > settings.bulk_import_max_file_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"文件过大，最大支持 {settings.bulk_import_max_file_size // (1024 * 1024)}MB",
+        )
+
+    try:
+        wb = load_workbook(BytesIO(content), read_only=True, data_only=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="无效的 Excel 文件")
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        raise HTTPException(status_code=400, detail="Excel 文件为空")
+
+    if len(rows) > settings.bulk_import_max_rows + 1:  # +1 for header
+        raise HTTPException(
+            status_code=400,
+            detail=f"数据行数过多，最多支持 {settings.bulk_import_max_rows} 行",
+        )
+
+    header = [str(c or "").strip() for c in rows[0]]
+    police_no_col = next((i for i, h in enumerate(header) if "警号" in h), None)
+    real_name_col = next((i for i, h in enumerate(header) if "姓名" in h), None)
+    mobile_col = next((i for i, h in enumerate(header) if "手机" in h), None)
+
+    if real_name_col is None:
+        raise HTTPException(status_code=400, detail="表头缺少「姓名」列")
+
+    # Pre-fetch existing police_nos and mobiles to avoid N+1 queries
+    existing_police_nos = set(
+        pno for pno in db.scalars(select(User.police_no).where(User.police_no.isnot(None))).all()
+    )
+    existing_mobiles = set(
+        mob for mob in db.scalars(select(User.mobile).where(User.mobile.isnot(None))).all()
+    )
+
+    created = 0
+    skipped = 0
+    errors = []
+
+    try:
+        for idx, row in enumerate(rows[1:], start=2):
+            if not row or all(c is None or str(c).strip() == "" for c in row):
+                continue
+
+            police_no = str(row[police_no_col]).strip() if police_no_col is not None and row[police_no_col] else None
+            real_name = str(row[real_name_col]).strip() if row[real_name_col] else None
+            mobile = str(row[mobile_col]).strip() if mobile_col is not None and row[mobile_col] else None
+
+            # Validate non-empty after strip
+            if police_no and not police_no:
+                police_no = None
+            if mobile and not mobile:
+                mobile = None
+
+            if not real_name:
+                errors.append(f"第 {idx} 行：姓名为空")
+                continue
+            if not police_no and not mobile:
+                errors.append(f"第 {idx} 行：警号与手机号至少填一个")
+                continue
+
+            # Validate format
+            if not _validate_police_no(police_no):
+                errors.append(f"第 {idx} 行：警号格式无效（长度应为 2-32）")
+                continue
+            if not _validate_mobile(mobile):
+                errors.append(f"第 {idx} 行：手机号格式无效（应为 11 位数字）")
+                continue
+
+            # Check duplicates
+            if police_no and police_no in existing_police_nos:
+                skipped += 1
+                continue
+            if mobile and mobile in existing_mobiles:
+                skipped += 1
+                continue
+
+            user = User(
+                police_no=police_no,
+                real_name=real_name,
+                mobile=mobile,
+                dept_name="祁门县公安局",
+                role=RoleEnum.OFFICER,
+                status=UserStatusEnum.ACTIVE,
+                password_hash=get_password_hash("123456"),
+            )
+            db.add(user)
+            if police_no:
+                existing_police_nos.add(police_no)
+            if mobile:
+                existing_mobiles.add(mobile)
+            created += 1
+
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        error_msg = str(e.orig) if e.orig else str(e)
+        if "police_no" in error_msg or "uk_users_police_no" in error_msg:
+            raise HTTPException(status_code=409, detail="批量导入失败：存在重复的警号")
+        elif "mobile" in error_msg or "uk_users_mobile" in error_msg:
+            raise HTTPException(status_code=409, detail="批量导入失败：存在重复的手机号")
+        else:
+            raise HTTPException(status_code=409, detail=f"批量导入失败：数据冲突 - {error_msg}")
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"批量导入失败：数据格式错误 - {str(e)}")
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"批量导入失败：{str(e)}")
+
+    write_audit(
+        db,
+        actor_user_id=current_user.id,
+        action="BULK_IMPORT_USERS",
+        target_type="user",
+        target_id="bulk",
+        detail_json={"created": created, "skipped": skipped, "error_count": len(errors)},
+    )
+    db.commit()
+
+    return AdminBulkImportResult(created=created, skipped=skipped, errors=errors)
+
+
 @router.patch("/users/{user_id}/role", response_model=ApiMessage, dependencies=USER_MANAGE_DEPS)
 def update_role(
     user_id: int,
@@ -251,7 +335,7 @@ def update_role(
         target_type="user",
         target_id=str(user.id),
         request_ip=request.client.host if request.client else None,
-        detail_json={"role": payload.role},
+        detail_json={"new_role": payload.role},
     )
     db.commit()
     return ApiMessage(message="角色已更新")
@@ -277,7 +361,7 @@ def update_status(
         target_type="user",
         target_id=str(user.id),
         request_ip=request.client.host if request.client else None,
-        detail_json={"status": payload.status},
+        detail_json={"new_status": payload.status},
     )
     db.commit()
     return ApiMessage(message="状态已更新")
@@ -290,31 +374,29 @@ def today_dashboard(
     target_date: date = Query(default_factory=date.today),
 ):
     _ = current_user
-    order_stmt = (
-        select(
-            func.count(Order.id).label("total_orders"),
-            func.sum(case((MealSlot.meal_type == MealTypeEnum.BREAKFAST, 1), else_=0)).label("breakfast_orders"),
-            func.sum(case((MealSlot.meal_type == MealTypeEnum.LUNCH, 1), else_=0)).label("lunch_orders"),
-            func.sum(case((MealSlot.meal_type == MealTypeEnum.DINNER, 1), else_=0)).label("dinner_orders"),
-        )
-        .select_from(Order)
-        .join(MealSlot, MealSlot.id == Order.slot_id)
-        .where(
-            MealSlot.meal_date == target_date,
-            Order.status != OrderStatusEnum.CANCELLED,
-        )
-    )
-    order_row = db.execute(order_stmt).one()
-    package_stats = _query_lunch_dinner_package_stats(db, from_date=target_date, to_date=target_date)
+    slots = db.scalars(select(MealSlot).where(MealSlot.meal_date == target_date)).all()
+    slot_map = {s.meal_type: s for s in slots}
 
-    return {
-        "date": target_date,
-        "total_orders": int(order_row.total_orders or 0),
-        "breakfast_orders": int(order_row.breakfast_orders or 0),
-        "lunch_orders": int(order_row.lunch_orders or 0),
-        "dinner_orders": int(order_row.dinner_orders or 0),
-        "package_stats": package_stats,
-    }
+    counts = (
+        db.execute(
+            select(MealSlot.meal_type, func.count(Order.id))
+            .join(Order, Order.slot_id == MealSlot.id)
+            .where(MealSlot.meal_date == target_date, Order.status == OrderStatusEnum.BOOKED)
+            .group_by(MealSlot.meal_type)
+        )
+        .all()
+    )
+    count_map = {meal_type: cnt for meal_type, cnt in counts}
+
+    return DashboardStats(
+        target_date=target_date,
+        breakfast_count=count_map.get(MealTypeEnum.BREAKFAST, 0),
+        lunch_count=count_map.get(MealTypeEnum.LUNCH, 0),
+        dinner_count=count_map.get(MealTypeEnum.DINNER, 0),
+        breakfast_open=slot_map.get(MealTypeEnum.BREAKFAST, MealSlot(is_open=False)).is_open,
+        lunch_open=slot_map.get(MealTypeEnum.LUNCH, MealSlot(is_open=False)).is_open,
+        dinner_open=slot_map.get(MealTypeEnum.DINNER, MealSlot(is_open=False)).is_open,
+    )
 
 
 @router.get("/meal-slots", response_model=list[AdminMealSlotOut], dependencies=MEAL_MANAGE_DEPS)
@@ -324,13 +406,8 @@ def list_meal_slots(
     meal_date: date = Query(...),
 ):
     _ = current_user
-    stmt = (
-        select(MealSlot)
-        .where(MealSlot.meal_date == meal_date)
-        .order_by(MealSlot.meal_type)
-    )
-    slots = db.scalars(stmt).all()
-    return [_to_meal_slot_out(slot) for slot in slots]
+    stmt = select(MealSlot).where(MealSlot.meal_date == meal_date).order_by(MealSlot.meal_type)
+    return db.scalars(stmt).all()
 
 
 @router.post("/meal-slots", response_model=AdminMealSlotOut, dependencies=MEAL_MANAGE_DEPS)
@@ -340,38 +417,41 @@ def create_or_update_meal_slot(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    meal_type = MealTypeEnum(payload.meal_type)
-    slot = db.scalar(
-        select(MealSlot).where(MealSlot.meal_date == payload.meal_date, MealSlot.meal_type == meal_type)
+    meal_type_enum = MealTypeEnum(payload.meal_type)
+    stmt = select(MealSlot).where(
+        MealSlot.meal_date == payload.meal_date,
+        MealSlot.meal_type == meal_type_enum,
     )
-    if not slot:
+    slot = db.scalar(stmt)
+
+    if slot:
+        if payload.booking_deadline is not None:
+            slot.booking_deadline = payload.booking_deadline
+        slot.is_open = payload.is_open
+        action = "UPDATE_MEAL_SLOT"
+    else:
         slot = MealSlot(
             meal_date=payload.meal_date,
-            meal_type=meal_type,
-            booking_deadline=payload.booking_deadline or _default_deadline(payload.meal_date),
+            meal_type=meal_type_enum,
+            booking_deadline=payload.booking_deadline,
             is_open=payload.is_open,
             created_by=current_user.id,
         )
         db.add(slot)
-        db.flush()
-    else:
-        slot.booking_deadline = payload.booking_deadline or slot.booking_deadline or _default_deadline(
-            payload.meal_date
-        )
-        slot.is_open = payload.is_open
+        action = "CREATE_MEAL_SLOT"
 
+    db.flush()
     write_audit(
         db,
         actor_user_id=current_user.id,
-        action="UPSERT_MEAL_SLOT",
+        action=action,
         target_type="meal_slot",
         target_id=str(slot.id),
         request_ip=request.client.host if request.client else None,
-        detail_json={"meal_date": str(payload.meal_date), "meal_type": payload.meal_type, "is_open": payload.is_open},
     )
     db.commit()
-    slot = _load_slot(db, slot.id)
-    return _to_meal_slot_out(slot)
+    db.refresh(slot)
+    return slot
 
 
 @router.patch("/meal-slots/{slot_id}/status", response_model=ApiMessage, dependencies=MEAL_MANAGE_DEPS)
@@ -384,9 +464,9 @@ def update_slot_status(
 ):
     slot = db.get(MealSlot, slot_id)
     if not slot:
-        raise HTTPException(status_code=404, detail="订餐时段不存在")
-    slot.is_open = payload.is_open
+        raise HTTPException(status_code=404, detail="时段不存在")
 
+    slot.is_open = payload.is_open
     write_audit(
         db,
         actor_user_id=current_user.id,
@@ -404,19 +484,15 @@ def update_slot_status(
 def list_meal_packages(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
-    meal_type: str | None = Query(default=None, pattern="^(breakfast|lunch|dinner)$"),
+    meal_type: str | None = Query(default=None),
 ):
     _ = current_user
-    stmt = (
-        select(MealPackage)
-        .where(MealPackage.is_deleted.is_(False))
-        .options(joinedload(MealPackage.items))
-        .order_by(MealPackage.meal_type, MealPackage.sort_order)
-    )
-    if meal_type is not None:
+    stmt = select(MealPackage).options(joinedload(MealPackage.items)).where(MealPackage.is_deleted == False)
+    if meal_type:
         stmt = stmt.where(MealPackage.meal_type == MealTypeEnum(meal_type))
-    pkgs = db.scalars(stmt).unique().all()
-    return [_to_meal_package_out(pkg) for pkg in pkgs]
+    stmt = stmt.order_by(MealPackage.sort_order, MealPackage.id)
+    packages = db.scalars(stmt).unique().all()
+    return [_build_meal_package_out(pkg) for pkg in packages]
 
 
 @router.post("/meal-packages", response_model=AdminMealPackageOut, dependencies=MEAL_MANAGE_DEPS)
@@ -426,65 +502,44 @@ def create_meal_package(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    meal_type = MealTypeEnum(payload.meal_type)
-    meal_category = (
-        MealCategoryEnum.NORMAL
-        if meal_type == MealTypeEnum.BREAKFAST
-        else MealCategoryEnum(payload.meal_category)
-    )
-    max_sort = (
-        db.scalar(
-            select(func.max(MealPackage.sort_order)).where(
-                MealPackage.meal_type == meal_type,
-                MealPackage.is_deleted.is_(False),
-            )
-        )
-        or 0
-    )
+    meal_type_enum = MealTypeEnum(payload.meal_type)
+    meal_category_enum = MealCategoryEnum(payload.meal_category)
 
-    pkg: MealPackage | None = None
-    preferred_code = payload.package_code
-    for _ in range(5):
-        package_code = _pick_available_package_code(db, meal_type, preferred_code=preferred_code)
-        preferred_code = None
-        try:
-            with db.begin_nested():
-                candidate_pkg = MealPackage(
-                    meal_type=meal_type,
-                    package_code=package_code,
-                    package_name=payload.package_name,
-                    meal_category=meal_category,
-                    is_selectable=payload.is_selectable,
-                    is_deleted=False,
-                    image_url=payload.image_url or settings.default_meal_image_url,
-                    price=payload.price,
-                    calories=payload.calories,
-                    protein_g=payload.protein_g,
-                    carbs_g=payload.carbs_g,
-                    fat_g=payload.fat_g,
-                    sort_order=int(max_sort) + 1,
-                )
-                db.add(candidate_pkg)
-                db.flush()
-            pkg = candidate_pkg
-            break
-        except IntegrityError as exc:
-            if not _is_slot_package_code_conflict(exc):
-                raise
+    package_code = payload.package_code or _generate_package_code(payload.meal_type)
 
-    if pkg is None:
-        raise HTTPException(status_code=409, detail="套餐编码冲突，请重试")
-
-    db.add(
-        MealPackageItem(
-            package_id=pkg.id,
-            item_name=payload.package_name,
-            quantity=1,
-            unit="份",
-            item_type="snack" if meal_type == MealTypeEnum.BREAKFAST else "other",
-            sort_order=1,
+    existing = db.scalar(
+        select(MealPackage).where(
+            MealPackage.meal_type == meal_type_enum,
+            MealPackage.package_code == package_code,
         )
     )
+    if existing:
+        raise HTTPException(status_code=400, detail="菜品编码已存在")
+
+    max_sort = db.scalar(
+        select(func.max(MealPackage.sort_order)).where(
+            MealPackage.meal_type == meal_type_enum,
+            MealPackage.is_deleted == False,
+        )
+    )
+    sort_order = (max_sort or 0) + 1
+
+    pkg = MealPackage(
+        meal_type=meal_type_enum,
+        package_code=package_code,
+        package_name=payload.package_name,
+        meal_category=meal_category_enum,
+        is_selectable=payload.is_selectable,
+        image_url=payload.image_url,
+        price=payload.price,
+        calories=payload.calories,
+        protein_g=payload.protein_g,
+        carbs_g=payload.carbs_g,
+        fat_g=payload.fat_g,
+        sort_order=sort_order,
+    )
+    db.add(pkg)
+    db.flush()
 
     write_audit(
         db,
@@ -493,12 +548,154 @@ def create_meal_package(
         target_type="meal_package",
         target_id=str(pkg.id),
         request_ip=request.client.host if request.client else None,
-        detail_json={"meal_type": meal_type.value, "package_name": payload.package_name},
+    )
+    db.commit()
+    db.refresh(pkg)
+    return _build_meal_package_out(pkg)
+
+
+@router.post("/meal-packages/bulk-import", response_model=AdminBulkImportResult, dependencies=MEAL_MANAGE_DEPS)
+async def bulk_import_meal_packages(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """批量导入菜品。Excel 表头：餐别 / 菜品名称 / 分类 / 单价。
+    餐别：早餐/中餐/晚餐；分类：普通套餐/减脂套餐/自选菜；单价为数字。
+    限制：文件最大 10MB，最多 1000 行数据。"""
+    if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
+
+    content = await file.read()
+    if len(content) > settings.bulk_import_max_file_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"文件过大，最大支持 {settings.bulk_import_max_file_size // (1024 * 1024)}MB",
+        )
+
+    try:
+        wb = load_workbook(BytesIO(content), read_only=True, data_only=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="无效的 Excel 文件")
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        raise HTTPException(status_code=400, detail="Excel 文件为空")
+
+    if len(rows) > settings.bulk_import_max_rows + 1:  # +1 for header
+        raise HTTPException(
+            status_code=400,
+            detail=f"数据行数过多，最多支持 {settings.bulk_import_max_rows} 行",
+        )
+
+    header = [str(c or "").strip() for c in rows[0]]
+    meal_type_col = next((i for i, h in enumerate(header) if "餐别" in h), None)
+    name_col = next((i for i, h in enumerate(header) if "名称" in h), None)
+    category_col = next((i for i, h in enumerate(header) if "分类" in h), None)
+    price_col = next((i for i, h in enumerate(header) if "单价" in h or "价格" in h), None)
+
+    if meal_type_col is None or name_col is None:
+        raise HTTPException(status_code=400, detail="表头缺少「餐别」或「菜品名称」列")
+
+    meal_type_map = {"早餐": "breakfast", "中餐": "lunch", "晚餐": "dinner"}
+    category_map = {"普通套餐": "normal", "减脂套餐": "fat_loss", "自选菜": "self_pick"}
+
+    # Pre-load existing packages to check duplicates
+    existing_packages = {}
+    for pkg in db.scalars(
+        select(MealPackage).where(MealPackage.is_deleted == False)
+    ).all():
+        key = (pkg.meal_type.value, pkg.package_name)
+        existing_packages[key] = pkg.id
+
+    created = 0
+    skipped = 0
+    errors = []
+
+    try:
+        for idx, row in enumerate(rows[1:], start=2):
+            if not row or all(c is None or str(c).strip() == "" for c in row):
+                continue
+
+            meal_type_raw = str(row[meal_type_col]).strip() if row[meal_type_col] else None
+            package_name = str(row[name_col]).strip() if row[name_col] else None
+            category_raw = str(row[category_col]).strip() if category_col is not None and row[category_col] else "普通套餐"
+            price_raw = row[price_col] if price_col is not None and row[price_col] else 0
+
+            if not meal_type_raw or not package_name:
+                errors.append(f"第 {idx} 行：餐别或菜品名称为空")
+                continue
+
+            meal_type = meal_type_map.get(meal_type_raw)
+            if not meal_type:
+                errors.append(f"第 {idx} 行：餐别「{meal_type_raw}」无效")
+                continue
+
+            category = category_map.get(category_raw, "normal")
+
+            try:
+                price = float(price_raw)
+                if price < 0:
+                    errors.append(f"第 {idx} 行：单价不能为负数")
+                    continue
+            except (ValueError, TypeError):
+                errors.append(f"第 {idx} 行：单价「{price_raw}」无效")
+                continue
+
+            # Check duplicate
+            key = (meal_type, package_name)
+            if key in existing_packages:
+                skipped += 1
+                continue
+
+            meal_type_enum = MealTypeEnum(meal_type)
+            package_code = _generate_package_code(meal_type)
+
+            max_sort = db.scalar(
+                select(func.max(MealPackage.sort_order)).where(
+                    MealPackage.meal_type == meal_type_enum,
+                    MealPackage.is_deleted == False,
+                )
+            )
+            sort_order = (max_sort or 0) + 1
+
+            pkg = MealPackage(
+                meal_type=meal_type_enum,
+                package_code=package_code,
+                package_name=package_name,
+                meal_category=MealCategoryEnum(category),
+                is_selectable=True,
+                price=price,
+                sort_order=sort_order,
+            )
+            db.add(pkg)
+            db.flush()
+            existing_packages[key] = pkg.id
+            created += 1
+
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        error_msg = str(e.orig) if e.orig else str(e)
+        raise HTTPException(status_code=409, detail=f"批量导入失败：数据冲突 - {error_msg}")
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"批量导入失败：数据格式错误 - {str(e)}")
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"批量导入失败：{str(e)}")
+
+    write_audit(
+        db,
+        actor_user_id=current_user.id,
+        action="BULK_IMPORT_MEAL_PACKAGES",
+        target_type="meal_package",
+        target_id="bulk",
+        detail_json={"created": created, "skipped": skipped, "error_count": len(errors)},
     )
     db.commit()
 
-    pkg = db.scalar(select(MealPackage).where(MealPackage.id == pkg.id).options(joinedload(MealPackage.items)))
-    return _to_meal_package_out(pkg)
+    return AdminBulkImportResult(created=created, skipped=skipped, errors=errors)
 
 
 @router.patch("/meal-packages/{package_id}", response_model=AdminMealPackageOut, dependencies=MEAL_MANAGE_DEPS)
@@ -509,35 +706,15 @@ def update_meal_package(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    pkg = db.scalar(
-        select(MealPackage)
-        .where(MealPackage.id == package_id)
-        .options(joinedload(MealPackage.items))
-    )
+    pkg = db.get(MealPackage, package_id)
     if not pkg or pkg.is_deleted:
         raise HTTPException(status_code=404, detail="菜品不存在")
 
-    provided_fields = payload.model_fields_set
-
     if payload.package_name is not None:
         pkg.package_name = payload.package_name
-        if pkg.items:
-            pkg.items[0].item_name = payload.package_name
-            for extra in pkg.items[1:]:
-                db.delete(extra)
-        else:
-            db.add(
-                MealPackageItem(
-                    package_id=pkg.id,
-                    item_name=payload.package_name,
-                    quantity=1,
-                    unit="份",
-                    item_type="snack" if pkg.meal_type == MealTypeEnum.BREAKFAST else "other",
-                    sort_order=1,
-                )
-            )
-
-    if "image_url" in provided_fields:
+    if payload.meal_category is not None:
+        pkg.meal_category = MealCategoryEnum(payload.meal_category)
+    if payload.image_url is not None:
         pkg.image_url = payload.image_url
     if payload.price is not None:
         pkg.price = payload.price
@@ -552,11 +729,6 @@ def update_meal_package(
     if payload.is_selectable is not None:
         pkg.is_selectable = payload.is_selectable
 
-    if pkg.meal_type == MealTypeEnum.BREAKFAST:
-        pkg.meal_category = MealCategoryEnum.NORMAL
-    elif payload.meal_category is not None:
-        pkg.meal_category = MealCategoryEnum(payload.meal_category)
-
     write_audit(
         db,
         actor_user_id=current_user.id,
@@ -566,42 +738,32 @@ def update_meal_package(
         request_ip=request.client.host if request.client else None,
     )
     db.commit()
-    pkg = db.scalar(select(MealPackage).where(MealPackage.id == pkg.id).options(joinedload(MealPackage.items)))
-    return _to_meal_package_out(pkg)
+    db.refresh(pkg)
+    return _build_meal_package_out(pkg)
 
 
 @router.post("/uploads/meal-image", dependencies=MEAL_MANAGE_DEPS)
 async def upload_meal_image(
-    request: Request,
-    current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[Session, Depends(get_db)],
-    image: UploadFile = File(...),
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
 ):
-    ext = _normalize_image_ext(image.content_type or "", image.filename)
-    payload = await image.read()
-    max_bytes = 3 * 1024 * 1024
-    if not payload:
-        raise HTTPException(status_code=400, detail="图片内容为空")
-    if len(payload) > max_bytes:
-        raise HTTPException(status_code=400, detail="图片大小不能超过 3MB")
+    _ = current_user
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="文件名为空")
 
-    upload_dir = Path(__file__).resolve().parents[3] / "static" / "uploads" / "meals"
+    ext = Path(file.filename).suffix.lower()
+    if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+        raise HTTPException(status_code=400, detail="仅支持 jpg/png/webp 图片")
+
+    upload_dir = Path(settings.upload_dir) / "meal_images"
     upload_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"meal-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{uuid4().hex[:8]}{ext}"
-    output_path = upload_dir / filename
-    output_path.write_bytes(payload)
-    image_url = f"/static/uploads/meals/{filename}"
 
-    write_audit(
-        db,
-        actor_user_id=current_user.id,
-        action="UPLOAD_MEAL_IMAGE",
-        target_type="meal_package_image",
-        target_id=filename,
-        request_ip=request.client.host if request.client else None,
-        detail_json={"image_url": image_url},
-    )
-    db.commit()
+    filename = f"{uuid4().hex}{ext}"
+    file_path = upload_dir / filename
+    content = await file.read()
+    file_path.write_bytes(content)
+
+    image_url = f"/uploads/meal_images/{filename}"
     return {"image_url": image_url}
 
 
@@ -612,51 +774,52 @@ def delete_meal_package(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    pkg = db.scalar(select(MealPackage).where(MealPackage.id == package_id))
+    pkg = db.get(MealPackage, package_id)
     if not pkg or pkg.is_deleted:
         raise HTTPException(status_code=404, detail="菜品不存在")
 
-    pkg.is_deleted = True
-    pkg.is_selectable = False
-
-    now = datetime.utcnow()
-    today = date.today()
-    affected_orders = db.scalars(
+    future_orders = db.scalars(
         select(Order)
-        .join(MealSlot, MealSlot.id == Order.slot_id)
+        .join(MealSlot, Order.slot_id == MealSlot.id)
         .where(
-            MealSlot.meal_type == pkg.meal_type,
-            MealSlot.meal_date >= today,
-            MealSlot.booking_deadline > now,
-            Order.status != OrderStatusEnum.VERIFIED,
-            Order.status != OrderStatusEnum.CANCELLED,
+            Order.package_id == package_id,
+            Order.status == OrderStatusEnum.BOOKED,
+            MealSlot.meal_date >= date.today(),
         )
-        .options(joinedload(Order.items))
-    ).unique().all()
+    ).all()
 
-    cancelled_order_ids: list[int] = []
-    trimmed_order_ids: list[int] = []
-    for order in affected_orders:
-        matching_items = [item for item in order.items if item.item_name == pkg.package_name]
-        if not matching_items:
-            continue
-        remaining = [item for item in order.items if item.item_name != pkg.package_name]
-        for item in matching_items:
-            db.delete(item)
-        if remaining:
-            trimmed_order_ids.append(order.id)
+    cancelled_order_ids = []
+    trimmed_order_ids = []
+
+    for order in future_orders:
+        if order.meal_category == MealCategoryEnum.SELF_PICK:
+            db.execute(select(OrderItem).where(OrderItem.order_id == order.id, OrderItem.item_name == pkg.package_name))
+            items = db.scalars(select(OrderItem).where(OrderItem.order_id == order.id)).all()
+            if len(items) <= 1:
+                order.status = OrderStatusEnum.CANCELLED
+                order.cancelled_at = datetime.utcnow()
+                cancelled_order_ids.append(order.id)
+            else:
+                db.execute(
+                    select(OrderItem).where(OrderItem.order_id == order.id, OrderItem.item_name == pkg.package_name)
+                )
+                for item in db.scalars(
+                    select(OrderItem).where(OrderItem.order_id == order.id, OrderItem.item_name == pkg.package_name)
+                ).all():
+                    db.delete(item)
+                trimmed_order_ids.append(order.id)
         else:
             order.status = OrderStatusEnum.CANCELLED
-            order.cancelled_at = now
-            order.note = "菜品已下架，订单自动取消"
+            order.cancelled_at = datetime.utcnow()
             cancelled_order_ids.append(order.id)
 
+    pkg.is_deleted = True
     write_audit(
         db,
         actor_user_id=current_user.id,
         action="DELETE_MEAL_PACKAGE",
         target_type="meal_package",
-        target_id=str(package_id),
+        target_id=str(pkg.id),
         request_ip=request.client.host if request.client else None,
         detail_json={
             "meal_type": pkg.meal_type.value,

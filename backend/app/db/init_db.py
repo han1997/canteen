@@ -19,8 +19,13 @@ def _ensure_column(table_name: str, column_name: str, ddl_sql: str) -> None:
 def _ensure_enum_value(table_name: str, column_name: str, alter_sql: str) -> None:
     """Idempotently extend an ENUM column. Reads information_schema.COLUMNS to
     inspect the current ENUM definition; if all expected values from alter_sql
-    are already present, skip. alter_sql must be a full `ALTER TABLE ... MODIFY
-    COLUMN ... ENUM(...) ...` statement."""
+    are already present, skip.
+
+    WARNING: alter_sql must be a trusted constant string (hardcoded in this module).
+    Never pass user input or dynamically constructed SQL to this function.
+    The parameter is passed directly to text() without validation.
+
+    alter_sql must be a full `ALTER TABLE ... MODIFY COLUMN ... ENUM(...) ...` statement."""
     import re
 
     expected = re.findall(r"'([^']+)'", alter_sql)
@@ -128,6 +133,55 @@ def _ensure_legacy_columns() -> None:
         "meal_category",
         "ALTER TABLE export_jobs MODIFY COLUMN meal_category ENUM('normal','fat_loss','self_pick','all') NOT NULL DEFAULT 'all'",
     )
+    _relax_users_police_no()
+    _ensure_users_mobile_unique()
+    _relax_meal_slots_booking_deadline()
+
+
+def _relax_users_police_no() -> None:
+    """Make users.police_no nullable so a user can register with only a mobile."""
+    with engine.connect() as connection:
+        row = connection.execute(
+            text(
+                "SELECT IS_NULLABLE FROM information_schema.COLUMNS "
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' "
+                "AND COLUMN_NAME = 'police_no'"
+            )
+        ).first()
+    if row is None or row[0] == "YES":
+        return
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE users MODIFY COLUMN police_no VARCHAR(32) NULL"))
+
+
+def _ensure_users_mobile_unique() -> None:
+    """Add a UNIQUE index on users.mobile if missing. MySQL allows multiple NULLs
+    in a UNIQUE column, so existing rows without a mobile are unaffected."""
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+    for index in inspector.get_indexes("users"):
+        cols = [c.lower() for c in index.get("column_names", []) if c]
+        if cols == ["mobile"] and index.get("unique"):
+            return
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE users ADD UNIQUE KEY uk_users_mobile (mobile)"))
+
+
+def _relax_meal_slots_booking_deadline() -> None:
+    """Make meal_slots.booking_deadline nullable so slots can be controlled purely by is_open."""
+    with engine.connect() as connection:
+        row = connection.execute(
+            text(
+                "SELECT IS_NULLABLE FROM information_schema.COLUMNS "
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'meal_slots' "
+                "AND COLUMN_NAME = 'booking_deadline'"
+            )
+        ).first()
+    if row is None or row[0] == "YES":
+        return
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE meal_slots MODIFY COLUMN booking_deadline DATETIME NULL"))
 
 
 def init_db() -> None:

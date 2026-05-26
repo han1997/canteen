@@ -2,6 +2,147 @@
 
 本仓库的变更日志，每次代码修改后追加。日期为本地时区（Asia/Shanghai）。
 
+## 2026-05-26
+
+### 批量导入安全性与健壮性增强
+
+**动机**：
+- 代码审查发现批量导入功能存在多个安全和健壮性问题，需要修复以防止生产环境风险。
+
+**修复内容**：
+1. **输入验证增强**：
+   - 新增 `_validate_police_no()` 和 `_validate_mobile()` 函数，验证警号长度（2-32）和手机号格式（11位数字）
+   - 批量导入用户时检查警号和手机号格式，格式错误记入 errors 数组
+   - 菜品导入增加价格负数检查
+
+2. **行数限制**：
+   - 新增配置项 `settings.bulk_import_max_rows = 1000`，防止超大文件导致内存问题
+   - 文件大小和行数限制移至 `backend/app/core/config.py` 统一管理
+
+3. **异常处理细化**：
+   - 区分 `IntegrityError`（数据冲突）、`ValueError`（格式错误）和通用异常
+   - IntegrityError 提供更明确的错误信息（重复警号/手机号）
+   - 所有异常都触发 `db.rollback()`，确保数据一致性
+
+4. **重复检测改进**：
+   - 菜品批量导入新增重复检测：预加载现有菜品 `(meal_type, package_name)` 组合
+   - 重复菜品跳过而非报错，与用户导入行为一致
+
+5. **SQL 注入防护**：
+   - 在 `_ensure_enum_value()` 函数添加安全警告注释，明确 `alter_sql` 必须是可信常量
+
+**技术细节**：
+- `backend/app/core/config.py`：新增 `bulk_import_max_file_size` 和 `bulk_import_max_rows` 配置
+- `backend/app/api/v1/admin.py`：
+  - 导入 `re` 模块用于正则验证
+  - 新增验证函数 `_validate_police_no()` / `_validate_mobile()`
+  - 批量导入接口增加行数检查、格式验证、细化异常处理
+  - 菜品导入增加重复检测逻辑
+- `backend/app/db/init_db.py`：`_ensure_enum_value()` 增加 SQL 注入警告注释
+
+**影响**：
+- 批量导入更安全，防止恶意或错误数据导致系统问题
+- 错误信息更清晰，便于用户定位问题
+- 配置集中管理，便于后续调整限制
+
+---
+
+## 2026-05-26
+
+### 订餐截止时间改为可选，订餐开关完全由管理员控制
+
+**动机**：
+- 原有逻辑强制要求设置截止时间，但实际业务中希望通过 `is_open` 开关灵活控制订餐，不需要固定的截止时间。
+
+**变更**：
+- 数据库 `meal_slots.booking_deadline` 改为 `NULL` 可选（原为 `NOT NULL`）
+- 后端 `AdminMealSlotCreateRequest.booking_deadline` 改为可选字段（原为必填）
+- 订餐逻辑调整：
+  - 优先检查 `is_open` 状态，关闭则不可订餐
+  - 如果设置了 `booking_deadline`，则额外检查是否已过期
+  - 如果未设置 `booking_deadline`，只要 `is_open=true` 就可以一直订餐
+- 小程序「菜品管理」页面：点击开关可直接创建时段并开放/关闭订餐，无需设置截止时间
+- 新增迁移函数 `_relax_meal_slots_booking_deadline()` 自动修改现有表结构
+
+**影响**：
+- 管理员可以通过开关灵活控制订餐，不受固定截止时间限制
+- 如需截止时间控制，仍可通过 API 设置 `booking_deadline` 字段
+- 现有数据的 `booking_deadline` 保持不变，仍会生效
+
+---
+
+## 2026-05-26
+
+### 新增：登录支持警号/手机号二选一；批量导入就餐人员与菜品
+
+**动机**：
+- 部分用户无警号或警号未录入系统，希望用手机号作为账号登录。
+- 首次部署或批量录入时，逐个手工创建用户/菜品效率低，需要 Excel 批量导入。
+
+**改动**：
+- 用户表 schema 调整：
+  - `backend/app/models/entities.py`：`User.police_no` 改为 `nullable=True`；`User.mobile` 增加 `unique=True`。
+  - `backend/sql/schema.sql`：同步 `police_no VARCHAR(32) NULL UNIQUE` / `mobile VARCHAR(20) NULL UNIQUE`。
+  - `backend/app/db/init_db.py`：新增 `_relax_users_police_no()` 与 `_ensure_users_mobile_unique()` 迁移函数，幂等修改现有表结构。
+- 登录与认证：
+  - `backend/app/schemas/auth.py`：`LoginRequest.police_no` 改为 `account`（警号或手机号）；`WechatBindRequest` 的 `police_no` / `mobile` 均改为可选，增加 `@model_validator` 校验至少填一个；`UserProfile` 增加 `mobile` 字段，`police_no` 改为可选。
+  - `backend/app/api/v1/auth.py`：`login` 用 `or_(User.police_no == account, User.mobile == account)` 查询；`wechat_bind` 先按 `police_no` 查，未找到再按 `mobile` 查，新建用户时默认密码改为 `123456`（常量 `DEFAULT_INITIAL_PASSWORD`）；JWT subject 改用 `str(user.id)` 替代 `police_no`。
+  - `backend/app/core/security.py`：`_fetch_user_for_token` 兼容新旧 token（数字 subject 按 `user.id` 查，否则按 `police_no` 查）。
+- 管理后台用户创建：
+  - `backend/app/schemas/admin.py`：`AdminUserCreateRequest` 的 `police_no` / `mobile` 均改为可选，`init_password` 默认 `123456`，增加 `@model_validator` 校验至少填一个；`AdminUserOut` 增加 `mobile` 字段，`police_no` 改为可选；新增 `AdminBulkImportResult` schema。
+  - `backend/app/api/v1/admin.py`：`list_users` 搜索条件增加 `User.mobile.like`；`create_user` 分别检查 `police_no` / `mobile` 冲突；新增 `POST /admin/users/bulk-import` 接口，读取 xlsx 表头「警号 / 姓名 / 手机号」，警号与手机号至少填一个，默认密码 `123456`、角色 `officer`、部门「祁门县公安局」。
+  - 新增 `POST /admin/meal-packages/bulk-import` 接口，读取 xlsx 表头「餐别 / 菜品名称 / 分类 / 单价」，餐别映射 `早餐→breakfast / 中餐→lunch / 晚餐→dinner`，分类映射 `普通套餐→normal / 减脂套餐→fat_loss / 自选菜→self_pick`（默认 `normal`），自动生成 `package_code`。
+- 小程序登录页：
+  - `miniprogram/pages/login/index.wxml`：「警号登录」改为「账号登录」，输入框 placeholder 改为「警号或手机号」；「首次绑定」增加「手机号（可选）」输入框，提示「警号与手机号至少填写其一。首次绑定后默认密码为 123456」。
+  - `miniprogram/pages/login/index.js`：`loginPoliceNo` 改为 `loginAccount`；`submitLogin` 传 `account` 字段；`submitBind` 增加 `bindMobile` 字段，校验至少填一个，提示文案改为「初始登录密码为 123456」。
+  - `miniprogram/pages/login/index.wxss`：新增 `.hint-text` 样式。
+- 小程序批量导入：
+  - `miniprogram/services/api.js`：新增 `bulkImportUsers(filePath)` / `bulkImportMealPackages(filePath)`，通过 `wx.uploadFile` 上传 xlsx 到对应后端接口。
+  - `miniprogram/pages/admin-users/index.wxml`：「新增用户」按钮旁增加「批量导入」按钮。
+  - `miniprogram/pages/admin-users/index.js`：新增 `bulkImport()` 方法，调用 `wx.chooseMessageFile` 选择 xlsx，上传后弹窗显示 `created / skipped / errors`。
+  - `miniprogram/pages/admin-meals/index.wxml`：「新增菜品」下方增加「批量导入菜品」按钮（`.full-btn` 占满行）。
+  - `miniprogram/pages/admin-meals/index.js`：新增 `bulkImport()` 方法，逻辑同用户导入。
+  - `miniprogram/pages/admin-meals/index.wxss`：新增 `.action-btn.full-btn { grid-column: 1 / -1; }`。
+
+**注意**：
+- 旧 token（subject 为 `police_no`）仍可用，`_fetch_user_for_token` 会自动兼容；新 token 全部使用 `user.id`。
+- `police_no` / `mobile` 均可为 `NULL`，但至少一个非空由应用层校验（Pydantic validator）；数据库 UNIQUE 约束允许多个 `NULL`。
+- 批量导入遇到重复账号（警号或手机号已存在）会跳过该行，不报错；表头缺失或必填字段为空会记入 `errors` 数组返回。
+- Excel 模板格式见后端 API 注释：用户「警号 / 姓名 / 手机号」，菜品「餐别 / 菜品名称 / 分类 / 单价」。
+- 批量导入安全增强：
+  - 文件大小限制 10MB，防止内存溢出
+  - 文件内容验证，捕获 openpyxl 异常防止上传非法文件
+  - 事务回滚机制，导入失败时自动回滚所有变更
+  - 性能优化：预加载现有 police_no/mobile，避免 N+1 查询问题
+  - 审计日志：记录 `BULK_IMPORT_USERS` / `BULK_IMPORT_MEAL_PACKAGES` 操作及统计信息
+
+## 2026-05-25
+
+### 新增：订餐开关支持「今天 / 明天」切换；导出 Excel 简化列 + 新增「菜品订购人」sheet
+
+**动机**：
+- 之前小程序 admin-meals 顶部「今日订餐开关」只能开关**今天**的早/中/晚 slot，明天的 slot 只能调用后端 API 创建。需求方希望直接在小程序里就能切到「明天」、提前一天开放/关闭订餐通道，避免凌晨临时上后台。
+- 导出的 xlsx 当前有 14 列（订单号/警号/姓名/日期/餐别/分类/订单状态/菜品/单价/份数/单位/小计/订单总价/下单时间），实际使用时只关心「姓名 / 菜品 / 份数 / 价格」；并希望按日期分块、每天一个清晰的日期标题。
+- 后厨备餐时希望另一个视角的输出：每个菜品分别有哪些人订购，方便按菜品分发。
+
+**改动**：
+- 订餐开关增加「明天」：
+  - `miniprogram/pages/admin-meals/index.js`：`data` 把原 `todayDate` / `todaySlotChips` 改为 `slotDayIndex` / `slotDayTabs`（`[{label:"今天",date},{label:"明天",date}]`）/ `slotChips`（当前 tab 的 3 个 chip）/ `slotChipsByDate`（两天缓存）。新方法 `activeSlotDate()` / `buildChipsForDate(date)` / `loadSlotChips()`（按 `slotDayTabs` 顺序逐个 `api.getAdminMealSlots(date)` 取，写入 cache 并刷新 `slotChips`） / `onSlotDayTabChange(e)` / `onToggleSlot(e)`（切换写入 `activeSlotDate()` 对应日期的 slot）。原 `loadTodaySlots` / `onToggleTodaySlot` 删除。
+  - `miniprogram/pages/admin-meals/index.wxml`：`.today-slots` 标题文案改「订餐开关」、右上日期显示 `slotDayTabs[slotDayIndex].date`；标题与 chips 之间插入两列 grid 的「今天 / 明天」tab；chips 绑定 `slotChips` + `onToggleSlot`。
+  - `miniprogram/pages/admin-meals/index.wxss`：新增 `.slot-day-tabs` / `.slot-day-tab` / `.slot-day-tab-active`（与 meal-tabs 同色调，高度 52rpx）。
+- Excel 导出：
+  - `backend/app/services/export_service.py`：删除未使用的 `MEAL_TYPE_LABEL` / `MEAL_CATEGORY_LABEL` / `ORDER_STATUS_LABEL` 三个字典及对应 `_to_cn_*` 与 `_normalize_enum_value` 辅助函数（简化后不再翻译餐别/分类/状态）。
+  - 主 sheet「订餐明细」表头从 14 列缩为 4 列：`姓名 / 菜品 / 份数 / 价格(元)`。`_format_sheet` 列宽与边框范围同步缩到 4 列。
+  - `run_export_job` 按 `meal_date` 把 grouped_orders 分桶，对每个日期先 `append` 一行作为日期横幅 → `merge_cells(1..4)` → 填浅蓝底色 (`E8F1FF`) + 蓝色加粗字（`DATE_BANNER_FILL` / `DATE_BANNER_FONT`） + 居中 + 4 列边框；横幅下方再 append 该日期的所有 OrderItem 行。`C` / `D` 列数字格式 `0.00`。
+  - 新增 sheet「菜品订购人」：列 `菜品 / 姓名 / 份数`，按 `item_name` 字典序输出，每组的「菜品」列做纵向合并；同组内行按 `(meal_date, real_name)` 排序，确保前/后端日期内同名买家相邻。新增 `_format_item_sheet` 复用与主 sheet 相同的表头底色/边框风格。
+- 文档：
+  - `backend/README.md`：「订餐时段 slot」一句的 UI 入口名称更新为「菜品管理 → 订餐开关（今天 / 明天）」。「导出文件下载」段落补充 xlsx 现在含两个 sheet 及各自字段含义。
+
+**注意**：
+- 「明天」tab 仅触达 `+1 天`；如需开关更远的日期仍需走后端 `POST /api/v1/admin/meal-slots`。`slotDayTabs` 在 `data` 初始化时计算，页面驻留跨过午夜后日期不会自动滚动；目前订餐管理是一次性操作，可接受，必要时刷新页面即可。
+- 「菜品订购人」按 `item_name` 字符串聚合，与「订餐明细」一致——历史上同名菜品（哪怕 `package_code` 不同）会被合并到同一组，匹配既有导出语义。
+- `_normalize_enum_value` 已删，若以后再需要中文枚举展示需要重新引入；当前导出已无 enum 列。
+
 ## 2026-05-25
 
 ### 调整：移除 slot 自动创建（每日定时任务 + 启动 seed），改为完全手动

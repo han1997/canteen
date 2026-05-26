@@ -17,6 +17,9 @@ class Settings(BaseSettings):
 
     default_meal_image_url: str = "/static/default-meal.png"
 
+    bulk_import_max_file_size: int = 10 * 1024 * 1024  # 10MB
+    bulk_import_max_rows: int = 1000
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

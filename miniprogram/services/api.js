@@ -87,6 +87,74 @@ function createAdminUser(payload) {
   });
 }
 
+function bulkImportUsers(filePath) {
+  const app = getApp();
+  const token = (app && app.globalData && app.globalData.token) || wx.getStorageSync("token") || "";
+  const baseUrl =
+    (app && app.globalData && app.globalData.apiBaseUrl) || getApiBaseUrl();
+  const normalizedBaseUrl = String(baseUrl).replace(/\/$/, "");
+
+  return new Promise((resolve, reject) => {
+    wx.uploadFile({
+      url: `${normalizedBaseUrl}/admin/users/bulk-import`,
+      filePath,
+      name: "file",
+      header: token ? { Authorization: `Bearer ${token}` } : {},
+      success: (res) => {
+        let payload = null;
+        try {
+          payload = JSON.parse(res.data || "{}");
+        } catch (err) {
+          reject(new Error("上传返回格式异常"));
+          return;
+        }
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(payload);
+          return;
+        }
+        reject(new Error((payload && (payload.detail || payload.message)) || "批量导入失败"));
+      },
+      fail: (err) => {
+        reject(new Error((err && err.errMsg) || "批量导入失败"));
+      }
+    });
+  });
+}
+
+function bulkImportMealPackages(filePath) {
+  const app = getApp();
+  const token = (app && app.globalData && app.globalData.token) || wx.getStorageSync("token") || "";
+  const baseUrl =
+    (app && app.globalData && app.globalData.apiBaseUrl) || getApiBaseUrl();
+  const normalizedBaseUrl = String(baseUrl).replace(/\/$/, "");
+
+  return new Promise((resolve, reject) => {
+    wx.uploadFile({
+      url: `${normalizedBaseUrl}/admin/meal-packages/bulk-import`,
+      filePath,
+      name: "file",
+      header: token ? { Authorization: `Bearer ${token}` } : {},
+      success: (res) => {
+        let payload = null;
+        try {
+          payload = JSON.parse(res.data || "{}");
+        } catch (err) {
+          reject(new Error("上传返回格式异常"));
+          return;
+        }
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(payload);
+          return;
+        }
+        reject(new Error((payload && (payload.detail || payload.message)) || "批量导入失败"));
+      },
+      fail: (err) => {
+        reject(new Error((err && err.errMsg) || "批量导入失败"));
+      }
+    });
+  });
+}
+
 function updateAdminUserRole(userId, role) {
   return request({
     url: `/admin/users/${userId}/role`,
@@ -277,6 +345,7 @@ module.exports = {
   cancelOrder,
   listAdminUsers,
   createAdminUser,
+  bulkImportUsers,
   updateAdminUserRole,
   updateAdminUserStatus,
   getTodayDashboard,
@@ -285,6 +354,7 @@ module.exports = {
   updateAdminMealSlotStatus,
   createAdminMealPackage,
   getAdminMealPackages,
+  bulkImportMealPackages,
   updateAdminMealPackage,
   deleteAdminMealPackage,
   uploadAdminMealImage,

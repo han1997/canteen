@@ -3,7 +3,7 @@
 ## 1. 技术选型
 - 框架：FastAPI + SQLAlchemy 2.0
 - 数据库：MySQL 8.0（见 `sql/schema.sql`）
-- 鉴权：JWT（警号登录 + 绑定流程）
+- 鉴权：JWT（警号/手机号登录 + 绑定流程）
 - 导出：OpenPyXL 生成 Excel
 - 菜品图片：后端静态目录 `/static`（默认图与上传图）
 
@@ -29,16 +29,33 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 菜品图片上传：
 - 接口：`POST /api/v1/admin/uploads/meal-image`
 - 字段：`image`（`jpg/png/webp`，最大 `3MB`）
-- 返回：`{"image_url": "/static/uploads/meals/xxx.png"}`
+- 返回：`{“image_url”: “/static/uploads/meals/xxx.png”}`
+
+批量导入：
+- 就餐人员：`POST /api/v1/admin/users/bulk-import`（需 `admin`/`super_admin` 角色）
+  - 上传 xlsx，表头：`警号 / 姓名 / 手机号`（警号与手机号至少填一个）
+  - 警号长度 2-32，手机号必须为 11 位数字
+  - 默认密码 `123456`、角色 `officer`、部门「祁门县公安局」
+  - 限制：文件最大 10MB，最多 1000 行数据
+  - 返回：`{“created”: 10, “skipped”: 2, “errors”: [“第3行：姓名为空”]}`
+- 菜品：`POST /api/v1/admin/meal-packages/bulk-import`（需 `kitchen`/`admin`/`super_admin` 角色）
+  - 上传 xlsx，表头：`餐别 / 菜品名称 / 分类 / 单价`
+  - 餐别：`早餐/中餐/晚餐`；分类：`普通套餐/减脂套餐/自选菜`（默认 `普通套餐`）
+  - 限制：文件最大 10MB，最多 1000 行数据
+  - 自动跳过重复菜品（相同餐别+菜品名称）
+  - 返回格式同上
 
 导出文件下载：
-- 列表/详情/创建接口（`POST /api/v1/stats/export`、`GET /api/v1/stats/export/{job_no}`）的返回体新增 `file_name`、`download_url` 字段；当 `status == "done"` 时 `download_url` 形如 `/stats/export/{job_no}/download`。
+- 列表/详情/创建接口（`POST /api/v1/stats/export`、`GET /api/v1/stats/export/{job_no}`）的返回体新增 `file_name`、`download_url` 字段；当 `status == “done”` 时 `download_url` 形如 `/stats/export/{job_no}/download`。
 - 下载接口：`GET /api/v1/stats/export/{job_no}/download`（需 `kitchen`/`admin`/`super_admin` 角色，携带 `Authorization: Bearer <token>`），通过 `FileResponse` 流式返回 xlsx，附带 `Content-Disposition`。
-- 小程序侧使用 `wx.downloadFile` + `wx.openDocument` 实现"下载/查看"，在手机微信里可通过右上角菜单转发或保存；PC 微信会直接调用系统 Excel/WPS 打开。
+- 小程序侧使用 `wx.downloadFile` + `wx.openDocument` 实现”下载/查看”，在手机微信里可通过右上角菜单转发或保存；PC 微信会直接调用系统 Excel/WPS 打开。
 - 上线前需在微信公众平台把后端域名加入 **downloadFile 合法域名**。
+- 导出的 xlsx 含两个 sheet：
+  - `订餐明细`：仅 `姓名 / 菜品 / 份数 / 价格(元)` 四列，按日期分组——每个日期的数据条目最上方插入一行带底色的日期横幅。
+  - `菜品订购人`：按菜品名分组，列出每个菜品的所有订购人（菜品 / 姓名 / 份数），同名菜品的「菜品」列纵向合并。
 
 开发环境自动初始化（`APP_ENV != production`）：
-- 启动时**不再自动创建任何订餐时段 slot**；早/中/晚每一天的时段都需管理员在「菜品管理 → 今日订餐开关」或后端 `POST /api/v1/admin/meal-slots` 手动创建并开启。
+- 启动时**不再自动创建任何订餐时段 slot**；早/中/晚每一天的时段都需管理员在「菜品管理 → 订餐开关（今天 / 明天）」或后端 `POST /api/v1/admin/meal-slots` 手动创建并开启。
 - 菜品按 `meal_type` 维护一份模板（早/中/晚各一份），与日期解耦：管理员任何时候新增/修改/删除一个菜品，所有日期的同餐次都立即生效。
 - 菜品支持软删除（`meal_packages.is_deleted`）：删除后用户端/统计/下单均不可见。删除时同步处理「同餐次、未截止、未核销且未取消」的订单——按菜品名移除对应 `OrderItem`；若订单因此变空，自动置为 `CANCELLED` 并写入「菜品已下架，订单自动取消」备注。已核销/已取消订单保留不动。
 - 启动时会自动补齐测试账号（密码均为 `123456`）：
@@ -56,15 +73,16 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ## 4. 角色与权限
 - `officer`：订餐、取消、查询个人订单
-- `kitchen`：核销、查看统计、导出
-- `admin`：用户管理 + 全量统计
+- `kitchen`：核销、查看统计、导出、批量导入菜品
+- `admin`：用户管理 + 全量统计 + 批量导入用户
 - `super_admin`：最高权限
 
 ## 5. 关键业务规则
+- 用户账号：警号与手机号二选一（至少填一个），默认密码 `123456`。
 - 同一用户同一时段只能有 1 笔有效订单（数据库唯一约束）。
 - 同一时段可一次提交多种食物/套餐及数量（重复提交会覆盖旧订单）。
 - 早餐为单点模式（如包子、油条、糍粑、豆浆），不走普通/减脂套餐二选一。
-- 食堂人员/管理员可按时段执行“停止订餐/恢复订餐”。
+- 食堂人员/管理员可按时段执行”停止订餐/恢复订餐”。
 - 早餐统计支持按单品汇总份数与金额（基于下单时单价）。
 - 过截止时间或时段关闭后不可下单/改单。
 - 全部关键操作写入 `audit_logs`（登录、下单、导出、权限调整、菜品发布/停订）。

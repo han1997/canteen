@@ -34,9 +34,14 @@ def create_or_replace_order(
     if not slot:
         raise HTTPException(status_code=404, detail="订餐时段不存在")
 
-    now = datetime.utcnow()
-    if not slot.is_open or now > slot.booking_deadline:
-        raise HTTPException(status_code=400, detail="当前时段已截止订餐")
+    if not slot.is_open:
+        raise HTTPException(status_code=400, detail="当前时段已关闭订餐")
+
+    # 如果设置了截止时间，检查是否已过期
+    if slot.booking_deadline:
+        now = datetime.utcnow()
+        if now > slot.booking_deadline:
+            raise HTTPException(status_code=400, detail="当前时段已截止订餐")
 
     quantity_by_package = _normalize_selections(selections)
     if not quantity_by_package:

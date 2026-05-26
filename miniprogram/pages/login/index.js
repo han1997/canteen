@@ -11,9 +11,10 @@ Page({
   data: {
     mode: "login",
     loading: false,
-    loginPoliceNo: "",
+    loginAccount: "",
     loginPassword: "",
     bindPoliceNo: "",
+    bindMobile: "",
     bindRealName: ""
   },
 
@@ -60,17 +61,17 @@ Page({
   },
 
   async submitLogin() {
-    const policeNo = this.data.loginPoliceNo.trim();
+    const account = this.data.loginAccount.trim();
     const password = this.data.loginPassword;
-    if (!policeNo || !password) {
-      toast("请填写警号和密码");
+    if (!account || !password) {
+      toast("请填写账号和密码");
       return;
     }
 
     this.setData({ loading: true });
     try {
       const result = await api.login({
-        police_no: policeNo,
+        account,
         password
       });
       await this.loginAndEnter(result.access_token);
@@ -84,25 +85,31 @@ Page({
 
   async submitBind() {
     const policeNo = this.data.bindPoliceNo.trim();
+    const mobile = this.data.bindMobile.trim();
     const realName = this.data.bindRealName.trim();
     const wechatCode = `mp_auto_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    if (!policeNo || !realName) {
-      toast("请填写警号和姓名");
+
+    if (!realName) {
+      toast("请填写姓名");
+      return;
+    }
+    if (!policeNo && !mobile) {
+      toast("警号与手机号至少填写其一");
       return;
     }
 
     this.setData({ loading: true });
     try {
       const result = await api.wechatBind({
-        police_no: policeNo,
+        police_no: policeNo || null,
+        mobile: mobile || null,
         real_name: realName,
-        mobile: null,
         wechat_code: wechatCode
       });
       await new Promise((resolve) => {
         wx.showModal({
           title: "首次绑定成功",
-          content: "初始登录密码为警号后6位。若系统已有该警号账号，则沿用原密码。请登录后及时修改密码。",
+          content: "初始登录密码为 123456。若系统已有该账号，则沿用原密码。请登录后及时修改密码。",
           showCancel: false,
           success: () => resolve(),
           fail: () => resolve()

@@ -21,10 +21,10 @@ USE canteen_db;
 -- ===========================================================
 CREATE TABLE IF NOT EXISTS users (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  police_no VARCHAR(32) NOT NULL UNIQUE,
+  police_no VARCHAR(32) NULL UNIQUE,
   real_name VARCHAR(64) NOT NULL,
   dept_name VARCHAR(128) NOT NULL DEFAULT '祁门县公安局',
-  mobile VARCHAR(20) NULL,
+  mobile VARCHAR(20) NULL UNIQUE,
   wechat_openid VARCHAR(64) NULL UNIQUE,
   role ENUM('officer','kitchen','admin','super_admin') NOT NULL DEFAULT 'officer',
   status ENUM('active','disabled') NOT NULL DEFAULT 'active',
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS meal_slots (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   meal_date DATE NOT NULL,
   meal_type ENUM('breakfast','lunch','dinner') NOT NULL,
-  booking_deadline DATETIME NOT NULL,
+  booking_deadline DATETIME NULL,
   is_open TINYINT(1) NOT NULL DEFAULT 1,
   created_by BIGINT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -20,9 +20,12 @@
         <button class="primary-btn half-btn" loading="{{loading}}" bindtap="searchUsers">查询</button>
         <button class="subtle-btn half-btn" bindtap="clearKeyword">清空</button>
       </view>
-      <button class="subtle-btn create-toggle" bindtap="toggleCreateForm">
-        {{showCreateForm ? '收起新增表单' : '新增用户'}}
-      </button>
+      <view class="inline">
+        <button class="subtle-btn half-btn" bindtap="toggleCreateForm">
+          {{showCreateForm ? '收起新增表单' : '新增用户'}}
+        </button>
+        <button class="subtle-btn half-btn" bindtap="bulkImport">批量导入</button>
+      </view>
     </view>
 
     <view wx:if="{{showCreateForm}}" class="card">

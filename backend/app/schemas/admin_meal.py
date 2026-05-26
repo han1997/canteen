@@ -32,7 +32,7 @@ class AdminMealSlotOut(BaseModel):
     id: int
     meal_date: date
     meal_type: str
-    booking_deadline: datetime
+    booking_deadline: datetime | None
     is_open: bool
 
 

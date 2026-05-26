@@ -210,6 +210,41 @@ Page({
     }
   },
 
+  bulkImport() {
+    wx.chooseMessageFile({
+      count: 1,
+      type: "file",
+      extension: ["xlsx", "xls"],
+      success: async (res) => {
+        if (!res.tempFiles || !res.tempFiles.length) {
+          toast("未选择文件");
+          return;
+        }
+        const filePath = res.tempFiles[0].path;
+        wx.showLoading({ title: "导入中...", mask: true });
+        try {
+          const result = await api.bulkImportUsers(filePath);
+          wx.hideLoading();
+          const msg = `导入完成：新增 ${result.created} 人，跳过 ${result.skipped} 人${
+            result.errors.length ? `，${result.errors.length} 条错误` : ""
+          }`;
+          wx.showModal({
+            title: "批量导入结果",
+            content: msg + (result.errors.length ? `\n\n${result.errors.slice(0, 3).join("\n")}` : ""),
+            showCancel: false
+          });
+          await this.loadUsers();
+        } catch (err) {
+          wx.hideLoading();
+          toast(err.message || "批量导入失败");
+        }
+      },
+      fail: () => {
+        toast("选择文件失败");
+      }
+    });
+  },
+
   logout() {
     const app = getApp();
     app.clearAuth();

@@ -1,7 +1,7 @@
 const api = require("../../services/api");
 const { withPullDownRefresh } = require("../../utils/pull-refresh");
 const { getApiBaseUrl } = require("../../config/env");
-const { todayString } = require("../../utils/date");
+const { todayString, addDays } = require("../../utils/date");
 
 const MANAGE_ROLES = ["kitchen", "admin", "super_admin"];
 const MEAL_TYPES = [
@@ -138,12 +138,17 @@ Page({
       dinner: emptyDraft()
     },
     categoryLabels: CATEGORY_OPTIONS.map((item) => item.label),
-    todayDate: todayString(),
-    todaySlotChips: [
+    slotDayIndex: 0,
+    slotDayTabs: [
+      { label: "今天", date: todayString() },
+      { label: "明天", date: addDays(todayString(), 1) }
+    ],
+    slotChips: [
       { mealType: "breakfast", label: "早餐", isOpen: false, slotId: null },
       { mealType: "lunch", label: "中餐", isOpen: false, slotId: null },
       { mealType: "dinner", label: "晚餐", isOpen: false, slotId: null }
-    ]
+    ],
+    slotChipsByDate: {}
   },
 
   async onShow() {
@@ -155,7 +160,7 @@ Page({
     await this.ensureAccess();
     if (this.data.allowed) {
       await this.loadPackages();
-      await this.loadTodaySlots();
+      await this.loadSlotChips();
     }
   },
 
@@ -164,7 +169,7 @@ Page({
       await this.ensureAccess();
       if (this.data.allowed) {
         await this.loadPackages();
-        await this.loadTodaySlots();
+        await this.loadSlotChips();
       }
     },
     { guard() { return !!this._pickingImage; } }
@@ -196,53 +201,100 @@ Page({
     return MEAL_TYPES[this.data.activeIndex].value;
   },
 
-  async loadTodaySlots() {
-    try {
-      const slots = await api.getAdminMealSlots(this.data.todayDate);
-      const slotByType = {};
-      (slots || []).forEach((slot) => {
-        slotByType[slot.meal_type] = slot;
-      });
-      const chips = this.data.todaySlotChips.map((chip) => {
-        const slot = slotByType[chip.mealType];
-        return {
-          ...chip,
-          isOpen: !!(slot && slot.is_open),
-          slotId: slot ? slot.id : null
-        };
-      });
-      this.setData({ todaySlotChips: chips });
-    } catch (err) {
-      // 静默失败：今日时段开关不可用不影响菜品管理主功能
-    }
+  activeSlotDate() {
+    const idx = this.data.slotDayIndex;
+    const tab = this.data.slotDayTabs[idx] || this.data.slotDayTabs[0];
+    return tab.date;
   },
 
-  async onToggleTodaySlot(e) {
+  buildChipsForDate(date) {
+    const cached = this.data.slotChipsByDate[date];
+    if (cached) {
+      return cached;
+    }
+    return [
+      { mealType: "breakfast", label: "早餐", isOpen: false, slotId: null },
+      { mealType: "lunch", label: "中餐", isOpen: false, slotId: null },
+      { mealType: "dinner", label: "晚餐", isOpen: false, slotId: null }
+    ];
+  },
+
+  async loadSlotChips() {
+    const dates = this.data.slotDayTabs.map((t) => t.date);
+    const slotChipsByDate = { ...this.data.slotChipsByDate };
+    for (const date of dates) {
+      try {
+        const slots = await api.getAdminMealSlots(date);
+        const slotByType = {};
+        (slots || []).forEach((slot) => {
+          slotByType[slot.meal_type] = slot;
+        });
+        const baseChips = [
+          { mealType: "breakfast", label: "早餐" },
+          { mealType: "lunch", label: "中餐" },
+          { mealType: "dinner", label: "晚餐" }
+        ];
+        slotChipsByDate[date] = baseChips.map((chip) => {
+          const slot = slotByType[chip.mealType];
+          return {
+            ...chip,
+            isOpen: !!(slot && slot.is_open),
+            slotId: slot ? slot.id : null
+          };
+        });
+      } catch (err) {
+        // 静默失败：开关不可用不影响菜品管理主功能
+        if (!slotChipsByDate[date]) {
+          slotChipsByDate[date] = this.buildChipsForDate(date);
+        }
+      }
+    }
+    this.setData({
+      slotChipsByDate,
+      slotChips: slotChipsByDate[this.activeSlotDate()] || this.buildChipsForDate(this.activeSlotDate())
+    });
+  },
+
+  onSlotDayTabChange(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    if (Number.isNaN(idx) || idx === this.data.slotDayIndex) {
+      return;
+    }
+    const tab = this.data.slotDayTabs[idx];
+    if (!tab) {
+      return;
+    }
+    this.setData({
+      slotDayIndex: idx,
+      slotChips: this.data.slotChipsByDate[tab.date] || this.buildChipsForDate(tab.date)
+    });
+  },
+
+  async onToggleSlot(e) {
     const mealType = e.currentTarget.dataset.mealType;
     const isOpen = !!e.detail.value;
-    const chipIndex = this.data.todaySlotChips.findIndex((c) => c.mealType === mealType);
+    const targetDate = this.activeSlotDate();
+    const chipIndex = this.data.slotChips.findIndex((c) => c.mealType === mealType);
     if (chipIndex < 0) {
       return;
     }
-    const chip = this.data.todaySlotChips[chipIndex];
+    const chip = this.data.slotChips[chipIndex];
 
     try {
       if (chip.slotId) {
         await api.updateAdminMealSlotStatus(chip.slotId, isOpen);
       } else {
-        // 今日还没有这餐次的 slot，先创建并直接设为期望状态
         await api.createOrUpdateAdminMealSlot({
-          meal_date: this.data.todayDate,
+          meal_date: targetDate,
           meal_type: mealType,
           is_open: isOpen
         });
       }
       toast(isOpen ? "已开放订餐" : "已停止订餐", "success");
-      await this.loadTodaySlots();
+      await this.loadSlotChips();
     } catch (err) {
       toast(err.message || "更新时段状态失败");
-      // 回退 UI 到服务端真实状态
-      await this.loadTodaySlots();
+      await this.loadSlotChips();
     }
   },
 
@@ -458,6 +510,41 @@ Page({
       wx.hideLoading();
       this._pickingImage = false;
     }
+  },
+
+  bulkImport() {
+    wx.chooseMessageFile({
+      count: 1,
+      type: "file",
+      extension: ["xlsx", "xls"],
+      success: async (res) => {
+        if (!res.tempFiles || !res.tempFiles.length) {
+          toast("未选择文件");
+          return;
+        }
+        const filePath = res.tempFiles[0].path;
+        wx.showLoading({ title: "导入中...", mask: true });
+        try {
+          const result = await api.bulkImportMealPackages(filePath);
+          wx.hideLoading();
+          const msg = `导入完成：新增 ${result.created} 个菜品，跳过 ${result.skipped} 个${
+            result.errors.length ? `，${result.errors.length} 条错误` : ""
+          }`;
+          wx.showModal({
+            title: "批量导入结果",
+            content: msg + (result.errors.length ? `\n\n${result.errors.slice(0, 3).join("\n")}` : ""),
+            showCancel: false
+          });
+          await this.loadPackages();
+        } catch (err) {
+          wx.hideLoading();
+          toast(err.message || "批量导入失败");
+        }
+      },
+      fail: () => {
+        toast("选择文件失败");
+      }
+    });
   },
 
   logout() {

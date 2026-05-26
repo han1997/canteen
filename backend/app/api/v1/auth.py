@@ -2,7 +2,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.security import (
@@ -27,11 +27,13 @@ from app.services.audit_service import write_audit
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 DEFAULT_DEPT_NAME = "祁门县公安局"
+DEFAULT_INITIAL_PASSWORD = "123456"
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, request: Request, db: Annotated[Session, Depends(get_db)]):
-    stmt = select(User).where(User.police_no == payload.police_no)
+    account = payload.account.strip()
+    stmt = select(User).where(or_(User.police_no == account, User.mobile == account))
     user = db.scalar(stmt)
     if not user or user.status != UserStatusEnum.ACTIVE or not user.password_hash:
         raise HTTPException(status_code=401, detail="账号或密码错误")
@@ -50,21 +52,33 @@ def login(payload: LoginRequest, request: Request, db: Annotated[Session, Depend
     )
     db.commit()
 
-    token = create_access_token(subject=user.police_no)
+    token = create_access_token(subject=str(user.id))
     return TokenResponse(access_token=token)
 
 
 @router.post("/wechat-bind", response_model=TokenResponse)
 def wechat_bind(payload: WechatBindRequest, request: Request, db: Annotated[Session, Depends(get_db)]):
     # In police intranet deployments, this should be replaced by trusted SSO/openid gateway.
-    user = db.scalar(select(User).where(User.police_no == payload.police_no))
+    user: User | None = None
+    if payload.police_no:
+        user = db.scalar(select(User).where(User.police_no == payload.police_no))
+    if not user and payload.mobile:
+        user = db.scalar(select(User).where(User.mobile == payload.mobile))
+
     if user:
         if user.real_name != payload.real_name:
-            raise HTTPException(status_code=400, detail="姓名与警号不匹配")
+            raise HTTPException(status_code=400, detail="姓名与账号不匹配")
         user.wechat_openid = f"mock_openid_{payload.wechat_code[-8:]}"
-        user.mobile = payload.mobile
+        if payload.mobile:
+            user.mobile = payload.mobile
+        if payload.police_no:
+            user.police_no = payload.police_no
         user.status = UserStatusEnum.ACTIVE
     else:
+        if payload.mobile:
+            mobile_conflict = db.scalar(select(User).where(User.mobile == payload.mobile))
+            if mobile_conflict:
+                raise HTTPException(status_code=400, detail="该手机号已被绑定")
         user = User(
             police_no=payload.police_no,
             real_name=payload.real_name,
@@ -73,7 +87,7 @@ def wechat_bind(payload: WechatBindRequest, request: Request, db: Annotated[Sess
             wechat_openid=f"mock_openid_{payload.wechat_code[-8:]}",
             role=RoleEnum.OFFICER,
             status=UserStatusEnum.ACTIVE,
-            password_hash=get_password_hash(payload.police_no[-6:]),
+            password_hash=get_password_hash(DEFAULT_INITIAL_PASSWORD),
             last_login_at=datetime.utcnow(),
         )
         db.add(user)
@@ -89,7 +103,7 @@ def wechat_bind(payload: WechatBindRequest, request: Request, db: Annotated[Sess
     )
     db.commit()
 
-    token = create_access_token(subject=user.police_no)
+    token = create_access_token(subject=str(user.id))
     return TokenResponse(access_token=token)
 
 

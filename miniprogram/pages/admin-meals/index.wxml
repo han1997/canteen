@@ -15,16 +15,28 @@
       </view>
       <view class="today-slots">
         <view class="today-slots-title">
-          <text class="muted">今日订餐开关</text>
-          <text class="muted today-slots-date">{{todayDate}}</text>
+          <text class="muted">订餐开关</text>
+          <text class="muted today-slots-date">{{slotDayTabs[slotDayIndex].date}}</text>
+        </view>
+        <view class="slot-day-tabs">
+          <view
+            wx:for="{{slotDayTabs}}"
+            wx:key="label"
+            wx:for-index="dayIdx"
+            class="slot-day-tab {{slotDayIndex === dayIdx ? 'slot-day-tab-active' : ''}}"
+            data-index="{{dayIdx}}"
+            bindtap="onSlotDayTabChange"
+          >
+            {{item.label}}
+          </view>
         </view>
         <view class="today-slots-grid">
-          <view wx:for="{{todaySlotChips}}" wx:key="mealType" class="today-slot-chip {{item.isOpen ? 'today-slot-on' : 'today-slot-off'}}">
+          <view wx:for="{{slotChips}}" wx:key="mealType" class="today-slot-chip {{item.isOpen ? 'today-slot-on' : 'today-slot-off'}}">
             <view class="today-slot-info">
               <text class="today-slot-label">{{item.label}}</text>
               <text class="today-slot-status">{{item.isOpen ? '开放中' : '已停止'}}</text>
             </view>
-            <switch class="today-slot-switch" checked="{{item.isOpen}}" data-meal-type="{{item.mealType}}" bindchange="onToggleTodaySlot" />
+            <switch class="today-slot-switch" checked="{{item.isOpen}}" data-meal-type="{{item.mealType}}" bindchange="onToggleSlot" />
           </view>
         </view>
       </view>
@@ -158,6 +170,9 @@
           <view class="action-row two-cols">
             <button class="subtle-btn action-btn" size="mini" bindtap="chooseDraftImage">上传图片</button>
             <button class="primary-btn action-btn" size="mini" bindtap="addPackage">新增菜品</button>
+          </view>
+          <view class="action-row">
+            <button class="subtle-btn action-btn full-btn" size="mini" bindtap="bulkImport">批量导入菜品</button>
           </view>
         </view>
       </view>

@@ -41,3 +41,9 @@
   color: #ffffff;
   box-shadow: 0 8rpx 18rpx rgba(11, 42, 74, 0.2);
 }
+
+.hint-text {
+  font-size: 24rpx;
+  line-height: 1.5;
+  margin-bottom: 16rpx;
+}

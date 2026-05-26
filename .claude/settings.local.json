@@ -32,7 +32,17 @@
       "Bash(python -m py_compile app/api/v1/admin.py app/api/v1/meals.py app/services/order_service.py app/models/entities.py app/db/init_db.py app/schemas/admin_meal.py)",
       "Bash(python -m py_compile backend/app/models/entities.py backend/app/db/init_db.py)",
       "Bash(python -c \"import ast; [ast.parse\\(open\\(p, encoding='utf-8'\\).read\\(\\)\\) for p in ['backend/app/main.py','backend/app/db/init_db.py','backend/app/db/seed_data.py','backend/app/core/config.py']]; print\\('syntax OK'\\)\")",
-      "Bash(python -c \"import ast; [ast.parse\\(open\\(p, encoding='utf-8-sig'\\).read\\(\\)\\) for p in ['backend/app/main.py','backend/app/db/init_db.py','backend/app/db/seed_data.py','backend/app/core/config.py']]; print\\('syntax OK'\\)\")"
+      "Bash(python -c \"import ast; [ast.parse\\(open\\(p, encoding='utf-8-sig'\\).read\\(\\)\\) for p in ['backend/app/main.py','backend/app/db/init_db.py','backend/app/db/seed_data.py','backend/app/core/config.py']]; print\\('syntax OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/services/export_service.py', encoding='utf-8'\\).read\\(\\)\\); print\\('ok'\\)\")",
+      "Bash(python -c \"from app.services import export_service; print\\('import ok'\\)\")",
+      "Bash(node -e \"require\\('./pages/admin-meals/index.js'\\)\")",
+      "Bash(python -m py_compile app/api/v1/auth.py app/api/v1/admin.py app/models/entities.py app/schemas/auth.py app/schemas/admin.py)",
+      "Bash(python -m py_compile app/api/v1/admin.py)",
+      "Bash(python -m py_compile app/api/v1/admin.py app/schemas/admin_meal.py)",
+      "Bash(python -m py_compile app/models/entities.py app/schemas/admin_meal.py app/schemas/meal.py app/services/order_service.py app/api/v1/admin.py app/db/init_db.py)",
+      "Bash(python -m py_compile app/api/v1/admin.py app/core/config.py app/db/init_db.py)",
+      "Bash(python -c \"import ast; [ast.parse\\(open\\(p, encoding='utf-8'\\).read\\(\\)\\) for p in ['app/api/v1/admin.py', 'app/core/config.py', 'app/db/init_db.py']]; print\\('所有文件语法检查通过'\\)\")",
+      "Bash(python *)"
     ]
   }
 }

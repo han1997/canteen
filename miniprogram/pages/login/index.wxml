@@ -1,7 +1,7 @@
 <view class="container">
   <view class="card brand-card">
     <view class="brand-title">公安食堂订餐系统</view>
-    <view class="muted">警号登录 / 首次微信绑定</view>
+    <view class="muted">账号登录 / 首次微信绑定</view>
   </view>
 
   <view class="card">
@@ -11,7 +11,7 @@
         data-mode="login"
         bindtap="switchMode"
       >
-        警号登录
+        账号登录
       </view>
       <view
         class="mode-item {{mode === 'bind' ? 'mode-active' : ''}}"
@@ -25,9 +25,9 @@
     <block wx:if="{{mode === 'login'}}">
       <input
         class="input"
-        placeholder="警号"
-        value="{{loginPoliceNo}}"
-        data-field="loginPoliceNo"
+        placeholder="警号或手机号"
+        value="{{loginAccount}}"
+        data-field="loginAccount"
         bindinput="onInput"
       />
       <input
@@ -44,9 +44,16 @@
     <block wx:else>
       <input
         class="input"
-        placeholder="警号"
+        placeholder="警号（可选）"
         value="{{bindPoliceNo}}"
         data-field="bindPoliceNo"
+        bindinput="onInput"
+      />
+      <input
+        class="input"
+        placeholder="手机号（可选）"
+        value="{{bindMobile}}"
+        data-field="bindMobile"
         bindinput="onInput"
       />
       <input
@@ -56,6 +63,7 @@
         data-field="bindRealName"
         bindinput="onInput"
       />
+      <view class="muted hint-text">警号与手机号至少填写其一。首次绑定后默认密码为 123456，请及时修改。</view>
       <button class="primary-btn" loading="{{loading}}" bindtap="submitBind">绑定并登录</button>
     </block>
   </view>

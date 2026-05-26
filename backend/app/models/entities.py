@@ -59,10 +59,10 @@ class User(Base, TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    police_no: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    police_no: Mapped[Optional[str]] = mapped_column(String(32), unique=True, nullable=True)
     real_name: Mapped[str] = mapped_column(String(64), nullable=False)
     dept_name: Mapped[str] = mapped_column(String(128), nullable=False, default="祁门县公安局")
-    mobile: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    mobile: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
     wechat_openid: Mapped[Optional[str]] = mapped_column(String(64), unique=True, nullable=True)
     role: Mapped[RoleEnum] = mapped_column(
         SAEnum(RoleEnum, values_callable=_enum_values, validate_strings=True),
@@ -88,7 +88,7 @@ class MealSlot(Base, TimestampMixin):
         SAEnum(MealTypeEnum, values_callable=_enum_values, validate_strings=True),
         nullable=False,
     )
-    booking_deadline: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    booking_deadline: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     is_open: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
 

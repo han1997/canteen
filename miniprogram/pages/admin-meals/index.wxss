@@ -74,6 +74,32 @@
   gap: 10rpx;
 }
 
+.slot-day-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10rpx;
+  margin-bottom: 10rpx;
+}
+
+.slot-day-tab {
+  height: 52rpx;
+  line-height: 52rpx;
+  text-align: center;
+  border-radius: 12rpx;
+  border: 1rpx solid #d3def0;
+  background: #f4f7fc;
+  color: #475569;
+  font-size: 24rpx;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.slot-day-tab-active {
+  background: linear-gradient(135deg, #0b2a4a 0%, #1e5fb6 100%);
+  border-color: #0b2a4a;
+  color: #ffffff;
+}
+
 .today-slot-chip {
   display: flex;
   align-items: center;
@@ -270,6 +296,10 @@
   font-weight: 600;
   white-space: nowrap;
   min-width: 0;
+}
+
+.action-btn.full-btn {
+  grid-column: 1 / -1;
 }
 
 .action-btn::after {
