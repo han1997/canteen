@@ -13,7 +13,7 @@ class AdminMealItemOut(BaseModel):
 
 class AdminMealPackageOut(BaseModel):
     id: int
-    meal_type: str
+    meal_types: list[str]  # 改为列表，支持多餐别
     package_code: str
     package_name: str
     meal_category: str
@@ -48,10 +48,10 @@ class AdminMealSlotStatusUpdateRequest(BaseModel):
 
 
 class AdminMealPackageCreateRequest(BaseModel):
-    meal_type: str = Field(pattern="^(breakfast|lunch|dinner)$")
+    meal_types: list[str] = Field(min_length=1, max_length=3)  # 改为列表，至少选一个餐别
     package_name: str = Field(min_length=1, max_length=128)
     package_code: str | None = Field(default=None, max_length=64)
-    meal_category: str = Field(default="normal", pattern="^(normal|fat_loss)$")
+    meal_category: str = Field(default="normal", pattern="^(normal|fat_loss|self_pick)$")
     image_url: str | None = Field(default=None, max_length=255)
     price: float = Field(default=0, ge=0, le=9999)
     calories: int | None = Field(default=None, ge=0)
@@ -62,8 +62,9 @@ class AdminMealPackageCreateRequest(BaseModel):
 
 
 class AdminMealPackageUpdateRequest(BaseModel):
+    meal_types: list[str] | None = Field(default=None, min_length=1, max_length=3)  # 支持更新餐别
     package_name: str | None = Field(default=None, min_length=1, max_length=128)
-    meal_category: str | None = Field(default=None, pattern="^(normal|fat_loss)$")
+    meal_category: str | None = Field(default=None, pattern="^(normal|fat_loss|self_pick)$")
     image_url: str | None = Field(default=None, max_length=255)
     price: float | None = Field(default=None, ge=0, le=9999)
     calories: int | None = Field(default=None, ge=0)

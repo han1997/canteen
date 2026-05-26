@@ -6,13 +6,18 @@ const { todayString, addDays } = require("../../utils/date");
 const MANAGE_ROLES = ["kitchen", "admin", "super_admin"];
 const MEAL_TYPES = [
   { label: "早餐", value: "breakfast" },
-  { label: "中餐", value: "lunch" },
-  { label: "晚餐", value: "dinner" }
+  { label: "午晚餐", value: "lunch_dinner" }
 ];
 const CATEGORY_OPTIONS = [
   { label: "普通套餐", value: "normal" },
   { label: "减脂套餐", value: "fat_loss" },
   { label: "自选菜", value: "self_pick" }
+];
+// 餐别多选选项（用于编辑时）
+const MEAL_TYPE_MULTI_OPTIONS = [
+  { label: "早餐", value: "breakfast" },
+  { label: "中餐", value: "lunch" },
+  { label: "晚餐", value: "dinner" }
 ];
 const DEFAULT_API_BASE_URL = getApiBaseUrl();
 const DEFAULT_MEAL_IMAGE_LOCAL = "/assets/default-meal.png";
@@ -102,26 +107,55 @@ function compressImageFile(filePath) {
   });
 }
 
-function emptyDraft() {
+function emptyDraft(defaultMealTypes) {
+  // defaultMealTypes: 默认勾选的餐别（取决于当前 tab）
   return {
     packageName: "",
     imageUrl: DEFAULT_MEAL_IMAGE_URL,
     imagePreviewUrl: toPreviewImageUrl(DEFAULT_MEAL_IMAGE_URL),
     priceInput: "",
-    categoryIndex: 0
+    categoryIndex: 0,
+    mealTypeCheckBreakfast: (defaultMealTypes || []).includes("breakfast"),
+    mealTypeCheckLunch: (defaultMealTypes || []).includes("lunch"),
+    mealTypeCheckDinner: (defaultMealTypes || []).includes("dinner")
   };
 }
 
 function formatPackage(pkg) {
+  // 计算菜品适用的餐别标签
+  const mealTypes = pkg.meal_types || [];
+  let mealTypeLabel = "";
+  const hasBreakfast = mealTypes.includes("breakfast");
+  const hasLunch = mealTypes.includes("lunch");
+  const hasDinner = mealTypes.includes("dinner");
+
+  if (hasBreakfast && !hasLunch && !hasDinner) {
+    mealTypeLabel = "早餐";
+  } else if (hasLunch && hasDinner) {
+    mealTypeLabel = "午晚餐";
+  } else if (hasLunch) {
+    mealTypeLabel = "中餐";
+  } else if (hasDinner) {
+    mealTypeLabel = "晚餐";
+  }
+
   return {
     id: pkg.id,
-    mealType: pkg.meal_type,
+    mealTypes: mealTypes,  // 数组形式存储
+    mealTypeLabel: mealTypeLabel,
+    // 默认在午晚餐 tab 中显示哪些菜品：包含 lunch 或 dinner 的
+    isBreakfast: hasBreakfast,
+    isLunchOrDinner: hasLunch || hasDinner,
     packageName: pkg.package_name,
     imageUrl: resolveImageUrl(pkg.image_url),
     imagePreviewUrl: toPreviewImageUrl(resolveImageUrl(pkg.image_url)),
     priceInput: String(pkg.price || 0),
     selectable: !!pkg.is_selectable,
-    categoryIndex: categoryIndex(pkg.meal_category)
+    categoryIndex: categoryIndex(pkg.meal_category),
+    // 餐别多选状态
+    mealTypeCheckBreakfast: hasBreakfast,
+    mealTypeCheckLunch: hasLunch,
+    mealTypeCheckDinner: hasDinner
   };
 }
 
@@ -131,11 +165,10 @@ Page({
     loading: false,
     activeIndex: 0,
     mealTypes: MEAL_TYPES,
-    packagesByType: { breakfast: [], lunch: [], dinner: [] },
+    packagesByType: { breakfast: [], lunch_dinner: [] },
     drafts: {
-      breakfast: emptyDraft(),
-      lunch: emptyDraft(),
-      dinner: emptyDraft()
+      breakfast: emptyDraft(["breakfast"]),
+      lunch_dinner: emptyDraft(["lunch", "dinner"])
     },
     categoryLabels: CATEGORY_OPTIONS.map((item) => item.label),
     slotDayIndex: 0,
@@ -199,6 +232,22 @@ Page({
 
   activeMealType() {
     return MEAL_TYPES[this.data.activeIndex].value;
+  },
+
+  // 根据当前 tab 推断默认勾选的餐别
+  defaultMealTypesForTab(tab) {
+    if (tab === "breakfast") return ["breakfast"];
+    if (tab === "lunch_dinner") return ["lunch", "dinner"];
+    return [];
+  },
+
+  // 从复选框状态收集已勾选的餐别
+  collectCheckedMealTypes(pkg) {
+    const result = [];
+    if (pkg.mealTypeCheckBreakfast) result.push("breakfast");
+    if (pkg.mealTypeCheckLunch) result.push("lunch");
+    if (pkg.mealTypeCheckDinner) result.push("dinner");
+    return result;
   },
 
   activeSlotDate() {
@@ -302,10 +351,16 @@ Page({
     this.setData({ loading: true });
     try {
       const pkgs = await api.getAdminMealPackages();
-      const grouped = { breakfast: [], lunch: [], dinner: [] };
+      const grouped = { breakfast: [], lunch_dinner: [] };
       (pkgs || []).forEach((pkg) => {
-        if (grouped[pkg.meal_type]) {
-          grouped[pkg.meal_type].push(formatPackage(pkg));
+        const formatted = formatPackage(pkg);
+        // 早餐 tab：仅显示包含 breakfast 的菜品
+        if (formatted.isBreakfast) {
+          grouped.breakfast.push(formatted);
+        }
+        // 午晚餐 tab：显示包含 lunch 或 dinner 的菜品
+        if (formatted.isLunchOrDinner) {
+          grouped.lunch_dinner.push(formatted);
         }
       });
       this.setData({ packagesByType: grouped });
@@ -349,6 +404,23 @@ Page({
     });
   },
 
+  onPackageMealTypeChange(e) {
+    const pkgIndex = Number(e.currentTarget.dataset.pkgIndex);
+    const mealType = this.activeMealType();
+    const field = e.currentTarget.dataset.field;  // mealTypeCheckBreakfast/Lunch/Dinner
+    this.setData({
+      [`packagesByType.${mealType}[${pkgIndex}].${field}`]: !!e.detail.value
+    });
+  },
+
+  onDraftMealTypeChange(e) {
+    const mealType = this.activeMealType();
+    const field = e.currentTarget.dataset.field;
+    this.setData({
+      [`drafts.${mealType}.${field}`]: !!e.detail.value
+    });
+  },
+
   async savePackage(e) {
     const pkgIndex = Number(e.currentTarget.dataset.pkgIndex);
     const mealType = this.activeMealType();
@@ -363,13 +435,22 @@ Page({
       return;
     }
 
+    // 收集勾选的餐别
+    const mealTypes = this.collectCheckedMealTypes(pkg);
+    if (mealTypes.length === 0) {
+      toast("请至少选择一个餐别");
+      return;
+    }
+
     const payload = {
+      meal_types: mealTypes,
       package_name: pkg.packageName.trim(),
       image_url: resolveImageUrl(pkg.imageUrl),
       price,
       is_selectable: pkg.selectable
     };
-    if (mealType !== "breakfast") {
+    // 早餐外的餐别才传 category
+    if (!(mealTypes.length === 1 && mealTypes[0] === "breakfast")) {
       payload.meal_category = CATEGORY_OPTIONS[pkg.categoryIndex].value;
     }
 
@@ -441,13 +522,20 @@ Page({
       return;
     }
 
+    // 收集勾选的餐别
+    const mealTypes = this.collectCheckedMealTypes(draft);
+    if (mealTypes.length === 0) {
+      toast("请至少选择一个餐别");
+      return;
+    }
+
     const payload = {
-      meal_type: mealType,
+      meal_types: mealTypes,
       package_name: name,
       image_url: resolveImageUrl(draft.imageUrl),
       price
     };
-    if (mealType !== "breakfast") {
+    if (!(mealTypes.length === 1 && mealTypes[0] === "breakfast")) {
       payload.meal_category = CATEGORY_OPTIONS[draft.categoryIndex].value;
     }
 
@@ -455,7 +543,7 @@ Page({
       await api.createAdminMealPackage(payload);
       toast("菜品已新增", "success");
       this.setData({
-        [`drafts.${mealType}`]: emptyDraft()
+        [`drafts.${mealType}`]: emptyDraft(this.defaultMealTypesForTab(mealType))
       });
       await this.loadPackages();
     } catch (err) {

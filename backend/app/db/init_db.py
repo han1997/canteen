@@ -184,7 +184,66 @@ def _relax_meal_slots_booking_deadline() -> None:
         connection.execute(text("ALTER TABLE meal_slots MODIFY COLUMN booking_deadline DATETIME NULL"))
 
 
+def _migrate_meal_packages_to_multi_meal_types() -> None:
+    """One-shot migration: switch meal_packages from single meal_type column to
+    multi-meal-types association table. Migrates existing data, drops old column
+    and constraint. Idempotent."""
+    inspector = inspect(engine)
+    if "meal_packages" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("meal_packages")}
+    has_meal_type = "meal_type" in columns
+
+    # Ensure association table exists
+    if "meal_package_meal_types" not in inspector.get_table_names():
+        with engine.begin() as connection:
+            connection.execute(text("""
+                CREATE TABLE meal_package_meal_types (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                    package_id BIGINT NOT NULL,
+                    meal_type ENUM('breakfast','lunch','dinner') NOT NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    CONSTRAINT fk_mpm_package_id FOREIGN KEY (package_id) REFERENCES meal_packages(id) ON DELETE CASCADE,
+                    UNIQUE KEY uk_package_meal_type (package_id, meal_type),
+                    INDEX idx_mpm_meal_type (meal_type)
+                ) ENGINE=InnoDB COMMENT='菜品-餐别多对多关联表'
+            """))
+
+    # Migrate data from old meal_type column to association table
+    if has_meal_type:
+        with engine.begin() as connection:
+            # 检查是否已经迁移过
+            count = connection.execute(
+                text("SELECT COUNT(*) FROM meal_package_meal_types")
+            ).scalar()
+            if count == 0:
+                connection.execute(text("""
+                    INSERT INTO meal_package_meal_types (package_id, meal_type)
+                    SELECT id, meal_type FROM meal_packages WHERE is_deleted = 0
+                """))
+
+        # 删除旧的唯一约束 uk_meal_packages_type_code
+        index_names = {idx["name"] for idx in inspector.get_indexes("meal_packages")}
+        if "uk_meal_packages_type_code" in index_names:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE meal_packages DROP INDEX uk_meal_packages_type_code"))
+
+        # 添加新的唯一约束 uk_meal_packages_code（如果还没有的话）
+        inspector_refreshed = inspect(engine)
+        index_names_refreshed = {idx["name"] for idx in inspector_refreshed.get_indexes("meal_packages")}
+        if "uk_meal_packages_code" not in index_names_refreshed:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE meal_packages ADD UNIQUE KEY uk_meal_packages_code (package_code)"))
+
+        # 将 meal_type 改为可空（暂时保留作为备份，后续迭代可删除）
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE meal_packages MODIFY COLUMN meal_type ENUM('breakfast','lunch','dinner') NULL"))
+
+
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_legacy_columns()
+    _migrate_meal_packages_to_multi_meal_types()
     seed_dev_users()

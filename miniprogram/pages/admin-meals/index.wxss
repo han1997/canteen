@@ -322,3 +322,26 @@
   font-size: 22rpx;
   margin: 10rpx 0 4rpx;
 }
+
+.meal-type-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+}
+
+.meal-type-label {
+  font-size: 24rpx;
+}
+
+.meal-type-check {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.meal-type-check checkbox {
+  transform: scale(0.7);
+}

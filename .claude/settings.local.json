@@ -42,7 +42,9 @@
       "Bash(python -m py_compile app/models/entities.py app/schemas/admin_meal.py app/schemas/meal.py app/services/order_service.py app/api/v1/admin.py app/db/init_db.py)",
       "Bash(python -m py_compile app/api/v1/admin.py app/core/config.py app/db/init_db.py)",
       "Bash(python -c \"import ast; [ast.parse\\(open\\(p, encoding='utf-8'\\).read\\(\\)\\) for p in ['app/api/v1/admin.py', 'app/core/config.py', 'app/db/init_db.py']]; print\\('所有文件语法检查通过'\\)\")",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(mysql *)",
+      "Bash(node -c ../miniprogram/pages/admin-meals/index.js)"
     ]
   }
 }

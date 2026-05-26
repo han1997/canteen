@@ -4,6 +4,117 @@
 
 ## 2026-05-26
 
+### 整理：合并 SQL 文件为单一初始化脚本
+
+**动机**：
+- 之前历经多次架构迁移，`schema.sql` 累积了大量幂等迁移代码（如 slot_id → meal_type、meal_type → 关联表等）
+- 新部署不需要这些遗留迁移代码，应该一份干净的最终结构
+- 独立的 `migration_meal_types.sql` 是临时迁移脚本，也应合并清理
+
+**变更**：
+- 重写 `backend/sql/schema.sql`：
+  - 仅包含最终的表结构和默认超管账号
+  - 移除所有 `SET @xxx_exists` / `PREPARE stmt` 等幂等迁移逻辑
+  - 移除 `meal_packages.meal_type` 列（已迁移到关联表）
+  - 表结构和字段添加详细的中文注释
+- 删除 `backend/sql/migration_meal_types.sql`（独立迁移脚本，已合并到主脚本）
+- 删除 `backend/fix_booking_deadline.py` / `fix_booking_deadline.sql`（临时修复脚本）
+
+**说明**：
+- 新部署：直接执行 `sql/schema.sql` 即可建库建表
+- 升级现有数据库：仍依赖 `backend/app/db/init_db.py` 中的迁移函数自动执行升级
+- 两条路径都能到达相同的最终状态
+
+---
+
+## 2026-05-26
+
+### 重大变更：菜品支持多餐别关联（中餐和晚餐可共用菜单）
+
+**动机**：
+- 中餐和晚餐的菜品高度重合，分开维护造成大量重复工作。
+- 业务方希望一个菜品可以同时关联到多个餐别（如午晚餐共用一份菜单）。
+
+**架构变更**：
+- 新建关联表 `meal_package_meal_types`，实现菜品与餐别的多对多关系
+- 移除 `meal_packages.meal_type` 列上的唯一约束（`uk_meal_packages_type_code`）
+- 新增 `uk_meal_packages_code`（仅 package_code 唯一）
+- 旧的 `meal_type` 列保留为可空，便于回滚（后续迭代可删除）
+
+**后端变更**：
+- 数据库迁移：
+  - `backend/sql/schema.sql`：新增 `meal_package_meal_types` 表
+  - `backend/app/db/init_db.py`：新增 `_migrate_meal_packages_to_multi_meal_types()` 迁移函数，自动将现有 `meal_type` 数据迁移到关联表
+  - `backend/sql/migration_meal_types.sql`：独立的迁移脚本，便于手动执行
+- ORM 模型：
+  - `backend/app/models/entities.py`：新增 `MealPackageMealType` 关联模型
+  - `MealPackage` 增加 `meal_type_associations` 关系和 `meal_types` 属性
+  - 移除 `MealPackage.meal_type` 列
+- Pydantic Schemas (`backend/app/schemas/admin_meal.py`)：
+  - `AdminMealPackageOut.meal_type` (str) → `meal_types` (list[str])
+  - `AdminMealPackageCreateRequest.meal_type` → `meal_types` (list[str], 至少 1 个)
+  - `AdminMealPackageUpdateRequest` 新增 `meal_types` 字段（可选）
+- API 接口 (`backend/app/api/v1/admin.py`)：
+  - `GET /admin/meal-packages` 按餐别过滤改为 JOIN 关联表
+  - `POST /admin/meal-packages` 接受 `meal_types` 数组，自动创建关联记录
+  - `PATCH /admin/meal-packages/{id}` 支持更新餐别关联（先删后插）
+  - `POST /admin/meal-packages/bulk-import` Excel 表头「餐别」支持「午晚餐」「中餐/晚餐」等组合值
+  - `DELETE /admin/meal-packages/{id}` 审计日志改用 `meal_types` 数组
+- 用户端 (`backend/app/api/v1/meals.py`)：
+  - 通过关联表 JOIN 查询每个餐别的菜品
+- 订餐验证 (`backend/app/services/order_service.py`)：
+  - 检查 `slot.meal_type in pkg.meal_types` 替代原来的相等判断
+
+**小程序变更**：
+- `miniprogram/pages/admin-meals/index.js`：
+  - 菜品 tab 从「早/中/晚」改为「早餐/午晚餐」两个 tab
+  - 早餐 tab 显示包含 breakfast 的菜品
+  - 午晚餐 tab 显示包含 lunch 或 dinner 的菜品
+  - 编辑/新增菜品时，通过 3 个复选框选择适用餐别（早餐/中餐/晚餐）
+  - 保存时收集勾选的餐别提交给后端
+- `miniprogram/pages/admin-meals/index.wxml`：
+  - 菜品卡片增加「适用餐别」3 个复选框
+  - 新增菜品区域增加「适用餐别」3 个复选框
+- `miniprogram/pages/admin-meals/index.wxss`：新增 `.meal-type-row` / `.meal-type-check` 样式
+
+**使用说明**：
+- 新增菜品时勾选「中餐」和「晚餐」即可同时在中餐和晚餐使用
+- 编辑现有菜品可调整其适用餐别（增减勾选项）
+- 批量导入 Excel 的「餐别」列支持：早餐、中餐、晚餐、午晚餐、中晚餐、中餐/晚餐
+- 重复菜品按 `package_name` 全局去重（不再按 `meal_type + package_name`）
+
+**回滚方案**：
+- `backend/sql/migration_meal_types.sql` 文件底部提供完整回滚 SQL
+- 旧的 `meal_type` 列保留为可空，未真正删除
+- 回滚步骤：先恢复 `meal_type` 为非空 → 删除 `uk_meal_packages_code` 约束 → 恢复 `uk_meal_packages_type_code` 约束 → 删除关联表
+
+**风险**：
+- 此变更涉及核心数据结构，建议先在测试环境完整测试
+- 数据迁移会读取所有 `meal_packages` 数据，大数据量时需注意性能
+- 旧版小程序客户端可能无法正确解析 `meal_types` 数组（需同步发版）
+
+---
+
+## 2026-05-26
+
+### 修复：订餐开关更新时自动清除截止时间
+
+**问题**：
+- 虽然代码已支持 `booking_deadline` 可选，但通过小程序开关更新时段状态时，旧的截止时间仍然保留
+- 导致即使开关打开，用户仍看到"已过截止时间"的提示
+
+**修复**：
+- `PATCH /api/v1/admin/meal-slots/{slot_id}/status` 接口在更新 `is_open` 状态时，同时将 `booking_deadline` 设为 `NULL`
+- 确保通过小程序开关操作后，订餐完全由 `is_open` 控制，不受旧截止时间影响
+
+**影响**：
+- 管理员在小程序点击开关后，该时段的截止时间会被自动清除
+- 已存在的旧时段数据会在下次开关操作时自动修复
+
+---
+
+## 2026-05-26
+
 ### 批量导入安全性与健壮性增强
 
 **动机**：

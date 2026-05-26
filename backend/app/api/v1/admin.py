@@ -19,6 +19,7 @@ from app.models import (
     MealCategoryEnum,
     MealPackage,
     MealPackageItem,
+    MealPackageMealType,
     MealSlot,
     MealTypeEnum,
     Order,
@@ -86,7 +87,7 @@ def _build_meal_package_out(pkg: MealPackage) -> AdminMealPackageOut:
     ]
     return AdminMealPackageOut(
         id=pkg.id,
-        meal_type=pkg.meal_type.value,
+        meal_types=[mt.value for mt in pkg.meal_types],  # 改为列表
         package_code=pkg.package_code,
         package_name=pkg.package_name,
         meal_category=pkg.meal_category.value,
@@ -467,6 +468,8 @@ def update_slot_status(
         raise HTTPException(status_code=404, detail="时段不存在")
 
     slot.is_open = payload.is_open
+    # 清除截止时间，让订餐完全由 is_open 控制
+    slot.booking_deadline = None
     write_audit(
         db,
         actor_user_id=current_user.id,
@@ -487,9 +490,21 @@ def list_meal_packages(
     meal_type: str | None = Query(default=None),
 ):
     _ = current_user
-    stmt = select(MealPackage).options(joinedload(MealPackage.items)).where(MealPackage.is_deleted == False)
+    stmt = (
+        select(MealPackage)
+        .options(
+            joinedload(MealPackage.items),
+            joinedload(MealPackage.meal_type_associations)
+        )
+        .where(MealPackage.is_deleted == False)
+    )
+
+    # 如果指定餐别，通过关联表过滤
     if meal_type:
-        stmt = stmt.where(MealPackage.meal_type == MealTypeEnum(meal_type))
+        stmt = stmt.join(MealPackageMealType).where(
+            MealPackageMealType.meal_type == MealTypeEnum(meal_type)
+        )
+
     stmt = stmt.order_by(MealPackage.sort_order, MealPackage.id)
     packages = db.scalars(stmt).unique().all()
     return [_build_meal_package_out(pkg) for pkg in packages]
@@ -502,30 +517,34 @@ def create_meal_package(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    meal_type_enum = MealTypeEnum(payload.meal_type)
+    # 验证餐别
+    meal_type_enums = []
+    for mt in payload.meal_types:
+        try:
+            meal_type_enums.append(MealTypeEnum(mt))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"无效的餐别: {mt}")
+
     meal_category_enum = MealCategoryEnum(payload.meal_category)
 
-    package_code = payload.package_code or _generate_package_code(payload.meal_type)
+    # 生成 package_code（使用第一个餐别作为前缀）
+    package_code = payload.package_code or _generate_package_code(payload.meal_types[0])
 
+    # 检查 package_code 是否已存在
     existing = db.scalar(
-        select(MealPackage).where(
-            MealPackage.meal_type == meal_type_enum,
-            MealPackage.package_code == package_code,
-        )
+        select(MealPackage).where(MealPackage.package_code == package_code)
     )
     if existing:
         raise HTTPException(status_code=400, detail="菜品编码已存在")
 
+    # 获取最大 sort_order
     max_sort = db.scalar(
-        select(func.max(MealPackage.sort_order)).where(
-            MealPackage.meal_type == meal_type_enum,
-            MealPackage.is_deleted == False,
-        )
+        select(func.max(MealPackage.sort_order)).where(MealPackage.is_deleted == False)
     )
     sort_order = (max_sort or 0) + 1
 
+    # 创建菜品
     pkg = MealPackage(
-        meal_type=meal_type_enum,
         package_code=package_code,
         package_name=payload.package_name,
         meal_category=meal_category_enum,
@@ -540,6 +559,14 @@ def create_meal_package(
     )
     db.add(pkg)
     db.flush()
+
+    # 创建餐别关联
+    for meal_type_enum in meal_type_enums:
+        assoc = MealPackageMealType(
+            package_id=pkg.id,
+            meal_type=meal_type_enum
+        )
+        db.add(assoc)
 
     write_audit(
         db,
@@ -597,16 +624,25 @@ async def bulk_import_meal_packages(
     if meal_type_col is None or name_col is None:
         raise HTTPException(status_code=400, detail="表头缺少「餐别」或「菜品名称」列")
 
-    meal_type_map = {"早餐": "breakfast", "中餐": "lunch", "晚餐": "dinner"}
+    # 餐别映射：支持单餐别和组合餐别（用 / 分隔）
+    meal_type_map = {
+        "早餐": ["breakfast"],
+        "中餐": ["lunch"],
+        "晚餐": ["dinner"],
+        "午餐": ["lunch"],
+        "午晚餐": ["lunch", "dinner"],
+        "中晚餐": ["lunch", "dinner"],
+        "中餐/晚餐": ["lunch", "dinner"],
+        "中餐,晚餐": ["lunch", "dinner"],
+    }
     category_map = {"普通套餐": "normal", "减脂套餐": "fat_loss", "自选菜": "self_pick"}
 
-    # Pre-load existing packages to check duplicates
+    # Pre-load existing packages to check duplicates (by package_name)
     existing_packages = {}
     for pkg in db.scalars(
         select(MealPackage).where(MealPackage.is_deleted == False)
     ).all():
-        key = (pkg.meal_type.value, pkg.package_name)
-        existing_packages[key] = pkg.id
+        existing_packages[pkg.package_name] = pkg.id
 
     created = 0
     skipped = 0
@@ -626,9 +662,9 @@ async def bulk_import_meal_packages(
                 errors.append(f"第 {idx} 行：餐别或菜品名称为空")
                 continue
 
-            meal_type = meal_type_map.get(meal_type_raw)
-            if not meal_type:
-                errors.append(f"第 {idx} 行：餐别「{meal_type_raw}」无效")
+            meal_types = meal_type_map.get(meal_type_raw)
+            if not meal_types:
+                errors.append(f"第 {idx} 行：餐别「{meal_type_raw}」无效（支持：早餐/中餐/晚餐/午晚餐）")
                 continue
 
             category = category_map.get(category_raw, "normal")
@@ -642,25 +678,19 @@ async def bulk_import_meal_packages(
                 errors.append(f"第 {idx} 行：单价「{price_raw}」无效")
                 continue
 
-            # Check duplicate
-            key = (meal_type, package_name)
-            if key in existing_packages:
+            # Check duplicate (by package_name only)
+            if package_name in existing_packages:
                 skipped += 1
                 continue
 
-            meal_type_enum = MealTypeEnum(meal_type)
-            package_code = _generate_package_code(meal_type)
+            package_code = _generate_package_code(meal_types[0])
 
             max_sort = db.scalar(
-                select(func.max(MealPackage.sort_order)).where(
-                    MealPackage.meal_type == meal_type_enum,
-                    MealPackage.is_deleted == False,
-                )
+                select(func.max(MealPackage.sort_order)).where(MealPackage.is_deleted == False)
             )
             sort_order = (max_sort or 0) + 1
 
             pkg = MealPackage(
-                meal_type=meal_type_enum,
                 package_code=package_code,
                 package_name=package_name,
                 meal_category=MealCategoryEnum(category),
@@ -670,7 +700,16 @@ async def bulk_import_meal_packages(
             )
             db.add(pkg)
             db.flush()
-            existing_packages[key] = pkg.id
+
+            # 创建餐别关联
+            for mt in meal_types:
+                assoc = MealPackageMealType(
+                    package_id=pkg.id,
+                    meal_type=MealTypeEnum(mt)
+                )
+                db.add(assoc)
+
+            existing_packages[package_name] = pkg.id
             created += 1
 
         db.commit()
@@ -709,6 +748,29 @@ def update_meal_package(
     pkg = db.get(MealPackage, package_id)
     if not pkg or pkg.is_deleted:
         raise HTTPException(status_code=404, detail="菜品不存在")
+
+    # 更新餐别关联
+    if payload.meal_types is not None:
+        # 验证餐别
+        meal_type_enums = []
+        for mt in payload.meal_types:
+            try:
+                meal_type_enums.append(MealTypeEnum(mt))
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"无效的餐别: {mt}")
+
+        # 删除旧关联
+        db.query(MealPackageMealType).filter(
+            MealPackageMealType.package_id == package_id
+        ).delete()
+
+        # 创建新关联
+        for meal_type_enum in meal_type_enums:
+            assoc = MealPackageMealType(
+                package_id=pkg.id,
+                meal_type=meal_type_enum
+            )
+            db.add(assoc)
 
     if payload.package_name is not None:
         pkg.package_name = payload.package_name
@@ -822,7 +884,7 @@ def delete_meal_package(
         target_id=str(pkg.id),
         request_ip=request.client.host if request.client else None,
         detail_json={
-            "meal_type": pkg.meal_type.value,
+            "meal_types": [mt.value for mt in pkg.meal_types],
             "package_name": pkg.package_name,
             "cancelled_order_ids": cancelled_order_ids,
             "trimmed_order_ids": trimmed_order_ids,

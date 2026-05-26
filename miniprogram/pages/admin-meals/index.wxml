@@ -94,6 +94,21 @@
                     <view class="tag-picker">{{categoryLabels[pkg.categoryIndex]}}</view>
                   </picker>
                 </view>
+                <view class="meal-type-row">
+                  <text class="muted meal-type-label">适用餐别：</text>
+                  <label class="meal-type-check">
+                    <checkbox value="breakfast" checked="{{pkg.mealTypeCheckBreakfast}}" data-pkg-index="{{pkgIndex}}" data-field="mealTypeCheckBreakfast" bindchange="onPackageMealTypeChange" />
+                    <text>早餐</text>
+                  </label>
+                  <label class="meal-type-check">
+                    <checkbox value="lunch" checked="{{pkg.mealTypeCheckLunch}}" data-pkg-index="{{pkgIndex}}" data-field="mealTypeCheckLunch" bindchange="onPackageMealTypeChange" />
+                    <text>中餐</text>
+                  </label>
+                  <label class="meal-type-check">
+                    <checkbox value="dinner" checked="{{pkg.mealTypeCheckDinner}}" data-pkg-index="{{pkgIndex}}" data-field="mealTypeCheckDinner" bindchange="onPackageMealTypeChange" />
+                    <text>晚餐</text>
+                  </label>
+                </view>
               </view>
             </view>
             <view class="pkg-actions">
@@ -162,6 +177,21 @@
               >
                 <view class="tag-picker">{{categoryLabels[drafts[mealTypes[activeIndex].value].categoryIndex]}}</view>
               </picker>
+            </view>
+            <view class="meal-type-row">
+              <text class="muted meal-type-label">适用餐别：</text>
+              <label class="meal-type-check">
+                <checkbox value="breakfast" checked="{{drafts[mealTypes[activeIndex].value].mealTypeCheckBreakfast}}" data-field="mealTypeCheckBreakfast" bindchange="onDraftMealTypeChange" />
+                <text>早餐</text>
+              </label>
+              <label class="meal-type-check">
+                <checkbox value="lunch" checked="{{drafts[mealTypes[activeIndex].value].mealTypeCheckLunch}}" data-field="mealTypeCheckLunch" bindchange="onDraftMealTypeChange" />
+                <text>中餐</text>
+              </label>
+              <label class="meal-type-check">
+                <checkbox value="dinner" checked="{{drafts[mealTypes[activeIndex].value].mealTypeCheckDinner}}" data-field="mealTypeCheckDinner" bindchange="onDraftMealTypeChange" />
+                <text>晚餐</text>
+              </label>
             </view>
           </view>
         </view>
