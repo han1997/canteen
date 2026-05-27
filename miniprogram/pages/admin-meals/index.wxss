@@ -1,7 +1,19 @@
+/* =============================================
+   菜品管理页
+   ============================================= */
 .hero-card {
-  background:
-    radial-gradient(circle at 92% 12%, rgba(255, 214, 165, 0.24) 0, rgba(255, 214, 165, 0) 48%),
-    linear-gradient(140deg, rgba(255, 255, 255, 0.96) 0%, rgba(238, 246, 255, 0.92) 100%);
+  background: linear-gradient(135deg, #0f5f9f 0%, #0b2a4a 100%);
+  border: none;
+  color: #ffffff;
+}
+
+.hero-card .section-title,
+.hero-card .muted {
+  color: #ffffff;
+}
+
+.hero-card .muted {
+  opacity: 0.85;
 }
 
 .hero-head {
@@ -16,6 +28,7 @@
 
 .helper-text {
   margin-top: 4rpx;
+  font-size: 24rpx;
 }
 
 .ghost-btn {
@@ -25,47 +38,67 @@
   line-height: 56rpx;
   padding: 0 18rpx;
   font-size: 24rpx;
-  border-radius: 14rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  border: none;
   white-space: nowrap;
 }
 
-.picker-row {
-  margin-top: 14rpx;
+.ghost-btn::after {
+  border: none;
 }
 
-.picker-value {
-  background: #ffffff;
-  border-radius: 16rpx;
-  padding: 14rpx 20rpx;
-  color: #0b2a4a;
-  font-weight: 700;
-  border: 1rpx solid #d3def0;
-}
-
-.meal-tabs {
-  margin-top: 16rpx;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10rpx;
-}
-
+/* 订餐开关板块 */
 .today-slots {
-  margin-top: 18rpx;
-  padding: 14rpx 16rpx;
-  border-radius: 16rpx;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1rpx solid #d6e4f7;
+  margin-top: 20rpx;
+  padding: 18rpx;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8rpx);
 }
 
 .today-slots-title {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10rpx;
+  margin-bottom: 14rpx;
+}
+
+.today-slots-title .muted {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  font-size: 26rpx;
 }
 
 .today-slots-date {
   font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.slot-day-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8rpx;
+  padding: 6rpx;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999rpx;
+  margin-bottom: 12rpx;
+}
+
+.slot-day-tab {
+  height: 56rpx;
+  line-height: 56rpx;
+  text-align: center;
+  border-radius: 999rpx;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.slot-day-tab-active {
+  background: #ffffff;
+  color: #0b2a4a;
 }
 
 .today-slots-grid {
@@ -74,51 +107,22 @@
   gap: 10rpx;
 }
 
-.slot-day-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10rpx;
-  margin-bottom: 10rpx;
-}
-
-.slot-day-tab {
-  height: 52rpx;
-  line-height: 52rpx;
-  text-align: center;
-  border-radius: 12rpx;
-  border: 1rpx solid #d3def0;
-  background: #f4f7fc;
-  color: #475569;
-  font-size: 24rpx;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.slot-day-tab-active {
-  background: linear-gradient(135deg, #0b2a4a 0%, #1e5fb6 100%);
-  border-color: #0b2a4a;
-  color: #ffffff;
-}
-
 .today-slot-chip {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8rpx;
-  padding: 8rpx 12rpx;
-  border-radius: 14rpx;
-  border: 1rpx solid #d3def0;
-  background: #f4f7fc;
+  gap: 6rpx;
+  padding: 10rpx 14rpx;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.92);
 }
 
 .today-slot-on {
-  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
-  border-color: #86efac;
+  background: #dbeafe;
 }
 
 .today-slot-off {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-  border-color: #fca5a5;
+  background: #fee2e2;
 }
 
 .today-slot-info {
@@ -130,12 +134,12 @@
 .today-slot-label {
   font-size: 24rpx;
   font-weight: 700;
-  color: #0b2a4a;
+  color: #1f2937;
 }
 
 .today-slot-status {
   font-size: 20rpx;
-  color: #475569;
+  color: #6b7280;
 }
 
 .today-slot-switch {
@@ -144,65 +148,35 @@
   flex: 0 0 auto;
 }
 
+/* 餐别 tab（早餐/午晚餐） */
+.meal-tabs {
+  margin-top: 20rpx;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8rpx;
+  padding: 6rpx;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999rpx;
+}
+
 .meal-tab {
-  height: 64rpx;
-  line-height: 64rpx;
+  height: 60rpx;
+  line-height: 60rpx;
   text-align: center;
-  border-radius: 14rpx;
-  border: 1rpx solid #d3def0;
-  background: #f4f7fc;
-  color: #475569;
+  border-radius: 999rpx;
+  color: rgba(255, 255, 255, 0.85);
   font-size: 26rpx;
   font-weight: 600;
 }
 
 .meal-tab-active {
-  background: linear-gradient(135deg, #0b2a4a 0%, #1e5fb6 100%);
-  border-color: #0b2a4a;
-  color: #ffffff;
+  background: #ffffff;
+  color: #0b2a4a;
 }
 
+/* 菜品列表 */
 .slot-shell {
   padding-top: 20rpx;
-}
-
-.slot-head {
-  margin-bottom: 14rpx;
-}
-
-.slot-badge {
-  display: inline-block;
-  padding: 8rpx 16rpx;
-  border-radius: 999rpx;
-  background: #e8f1ff;
-  color: #0b2a4a;
-  font-size: 24rpx;
-  font-weight: 700;
-}
-
-.slot-deadline {
-  margin-top: 8rpx;
-}
-
-.switch-wrap {
-  text-align: right;
-}
-
-.switch-pill {
-  margin-top: 8rpx;
-  font-size: 22rpx;
-  padding: 6rpx 12rpx;
-  border-radius: 999rpx;
-}
-
-.switch-on {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.switch-off {
-  background: #ffedd5;
-  color: #9a3412;
 }
 
 .pkg-list {
@@ -211,10 +185,11 @@
 }
 
 .pkg-edit-card {
-  padding: 14rpx;
-  border-radius: 16rpx;
-  background: linear-gradient(145deg, #f7fbff 0%, #edf4fd 100%);
-  border: 1rpx solid #d6e4f7;
+  padding: 16rpx;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1rpx solid var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 
 .pkg-top {
@@ -225,21 +200,22 @@
 
 .meal-image {
   width: 168rpx;
-  height: 126rpx;
-  border-radius: 14rpx;
-  border: 1rpx solid #d5e3f6;
-  background: #f0f5fb;
+  height: 132rpx;
+  border-radius: var(--radius-md);
+  background: var(--color-divider);
   flex-shrink: 0;
 }
 
 .pkg-fields {
   flex: 1;
+  min-width: 0;
 }
 
 .compact-input {
   height: 70rpx;
   margin-bottom: 10rpx;
-  border-radius: 12rpx;
+  border-radius: var(--radius-md);
+  font-size: 26rpx;
 }
 
 .field-row {
@@ -259,16 +235,52 @@
 .tag-picker {
   height: 70rpx;
   line-height: 70rpx;
-  background: #e7effb;
-  border-radius: 12rpx;
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-md);
   padding: 0 18rpx;
-  color: #0b2a4a;
+  color: var(--color-primary-dark);
   font-size: 24rpx;
   font-weight: 600;
 }
 
+.meal-type-badge {
+  display: inline-block;
+  padding: 4rpx 12rpx;
+  margin-bottom: 8rpx;
+  font-size: 22rpx;
+  color: var(--color-primary-dark);
+  background-color: var(--color-primary-soft);
+  border-radius: 999rpx;
+  align-self: flex-start;
+  font-weight: 600;
+}
+
+.meal-type-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 8rpx;
+}
+
+.meal-type-label {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+}
+
+.meal-type-check {
+  display: flex;
+  align-items: center;
+  gap: 2rpx;
+  font-size: 24rpx;
+}
+
+.meal-type-check checkbox {
+  transform: scale(0.7);
+}
+
 .pkg-actions {
-  margin-top: 12rpx;
+  margin-top: 14rpx;
   display: flex;
   flex-direction: column;
   gap: 10rpx;
@@ -279,12 +291,14 @@
   align-items: center;
   justify-content: flex-end;
   gap: 12rpx;
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
 }
 
 .action-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10rpx;
+  gap: 8rpx;
 }
 
 .action-row.two-cols {
@@ -296,7 +310,7 @@
   height: 64rpx;
   line-height: 64rpx;
   padding: 0 12rpx;
-  border-radius: 12rpx;
+  border-radius: var(--radius-md);
   font-size: 24rpx;
   font-weight: 600;
   white-space: nowrap;
@@ -311,53 +325,24 @@
   border: none;
 }
 
+/* 新增菜品卡片 */
 .add-card {
   margin-top: 16rpx;
-  padding: 16rpx;
-  border-radius: 16rpx;
-  border: 1rpx dashed #a7bddc;
-  background: linear-gradient(145deg, #fbfdff 0%, #f1f7ff 100%);
+  padding: 18rpx;
+  border-radius: var(--radius-lg);
+  border: 2rpx dashed var(--color-primary-line);
+  background: var(--color-surface-alt);
 }
 
 .add-title {
-  margin-bottom: 10rpx;
+  margin-bottom: 12rpx;
+  color: var(--color-primary-dark);
+  font-weight: 700;
+  font-size: 26rpx;
 }
 
 .new-tip {
   font-size: 22rpx;
   margin: 10rpx 0 4rpx;
-}
-
-.meal-type-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12rpx;
-  margin-top: 8rpx;
-  font-size: 24rpx;
-}
-
-.meal-type-label {
-  font-size: 24rpx;
-}
-
-.meal-type-check {
-  display: flex;
-  align-items: center;
-  gap: 4rpx;
-}
-
-.meal-type-check checkbox {
-  transform: scale(0.7);
-}
-
-.meal-type-badge {
-  display: inline-block;
-  padding: 2rpx 12rpx;
-  margin-bottom: 6rpx;
-  font-size: 22rpx;
-  color: #2563eb;
-  background-color: #dbeafe;
-  border-radius: 10rpx;
-  align-self: flex-start;
+  color: var(--color-text-muted);
 }

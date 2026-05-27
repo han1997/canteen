@@ -1,0 +1,232 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-27T00:00:00+08:00",
+  "title": "Design System: 公安食堂订餐",
+  "extensions": {
+    "colorMeta": {
+      "bg": {
+        "role": "neutral",
+        "displayName": "Intranet Mist",
+        "canonical": "#f5f7f8",
+        "tonalRamp": ["oklch(18% 0.004 180)", "oklch(28% 0.004 180)", "oklch(40% 0.004 180)", "oklch(52% 0.004 180)", "oklch(64% 0.004 180)", "oklch(76% 0.004 180)", "oklch(88% 0.004 180)", "oklch(96% 0.004 180)"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Work Surface",
+        "canonical": "#ffffff",
+        "tonalRamp": ["oklch(18% 0.003 180)", "oklch(30% 0.003 180)", "oklch(42% 0.003 180)", "oklch(54% 0.003 180)", "oklch(66% 0.003 180)", "oklch(78% 0.003 180)", "oklch(90% 0.003 180)", "oklch(98% 0.003 180)"]
+      },
+      "primary": {
+        "role": "primary",
+        "displayName": "Police Blue",
+        "canonical": "#0f5f9f",
+        "tonalRamp": ["oklch(18% 0.055 255)", "oklch(28% 0.070 255)", "oklch(38% 0.085 255)", "oklch(48% 0.095 255)", "oklch(58% 0.080 255)", "oklch(68% 0.060 255)", "oklch(82% 0.035 255)", "oklch(94% 0.018 255)"]
+      },
+      "accent": {
+        "role": "secondary",
+        "displayName": "Meal Amber",
+        "canonical": "#ed8936",
+        "tonalRamp": ["oklch(20% 0.060 55)", "oklch(32% 0.080 55)", "oklch(44% 0.105 55)", "oklch(56% 0.130 55)", "oklch(68% 0.115 55)", "oklch(78% 0.075 55)", "oklch(88% 0.040 55)", "oklch(95% 0.020 55)"]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "System Red",
+        "canonical": "#ef4444",
+        "tonalRamp": ["oklch(20% 0.070 25)", "oklch(32% 0.100 25)", "oklch(44% 0.130 25)", "oklch(56% 0.160 25)", "oklch(68% 0.125 25)", "oklch(78% 0.080 25)", "oklch(88% 0.045 25)", "oklch(95% 0.022 25)"]
+      },
+      "info": {
+        "role": "tertiary",
+        "displayName": "System Blue",
+        "canonical": "#3b82f6",
+        "tonalRamp": ["oklch(20% 0.070 260)", "oklch(32% 0.100 260)", "oklch(44% 0.130 260)", "oklch(56% 0.160 260)", "oklch(68% 0.120 260)", "oklch(78% 0.080 260)", "oklch(88% 0.045 260)", "oklch(95% 0.022 260)"]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Section Title",
+        "purpose": "Page and card section headings in compact mobile screens."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Main form values, dish names, order information, and readable operational text."
+      },
+      "label": {
+        "displayName": "Dense Label",
+        "purpose": "Buttons, tabs, picker chips, badges, and admin controls."
+      }
+    },
+    "shadows": [
+      {
+        "name": "surface-rest",
+        "value": "0 2rpx 8rpx rgba(15, 23, 42, 0.04)",
+        "purpose": "Default card and meal row shadow."
+      },
+      {
+        "name": "control-lift",
+        "value": "0 4rpx 12rpx rgba(15, 95, 159, 0.18)",
+        "purpose": "Primary button and selected pill lift."
+      },
+      {
+        "name": "panel-lift",
+        "value": "0 8rpx 24rpx rgba(15, 23, 42, 0.06)",
+        "purpose": "Secondary panels that need stronger grouping."
+      },
+      {
+        "name": "header-lift",
+        "value": "0 16rpx 40rpx rgba(15, 23, 42, 0.08)",
+        "purpose": "Top identity cards or major admin headers only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-fast",
+        "value": "150ms ease",
+        "purpose": "Button and control state feedback."
+      },
+      {
+        "name": "state-standard",
+        "value": "200ms ease",
+        "purpose": "Segmented controls, tabs, and selection feedback."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "admin-top-actions-wrap",
+        "value": "680rpx"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main task action for login, submit, save, and export.",
+      "html": "<button class=\"ds-btn-primary\">提交本时段订单</button>",
+      "css": ".ds-btn-primary { height: 46px; padding: 0 18px; border: none; border-radius: 8px; background: #0f5f9f; color: #ffffff; font: 600 15px/46px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Source Han Sans SC', sans-serif; box-shadow: 0 2px 6px rgba(15, 95, 159, 0.18); transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease; } .ds-btn-primary:hover { background: #0b2a4a; box-shadow: 0 4px 10px rgba(15, 95, 159, 0.22); } .ds-btn-primary:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; } .ds-btn-primary:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Subtle Button",
+      "kind": "button",
+      "refersTo": "button-subtle",
+      "description": "Supporting action for navigation, refresh, upload, and secondary admin actions.",
+      "html": "<button class=\"ds-btn-subtle\">刷新任务</button>",
+      "css": ".ds-btn-subtle { height: 40px; padding: 0 16px; border: 1px solid #93c5fd; border-radius: 8px; background: #ffffff; color: #0f5f9f; font: 600 14px/40px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Source Han Sans SC', sans-serif; transition: background 150ms ease, border-color 150ms ease, color 150ms ease; } .ds-btn-subtle:hover { background: #dbeafe; border-color: #0f5f9f; color: #0b2a4a; } .ds-btn-subtle:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; } .ds-btn-subtle:active { background: #bfdbfe; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive action for deleting dishes or ending sessions.",
+      "html": "<button class=\"ds-btn-danger\">删除菜品</button>",
+      "css": ".ds-btn-danger { height: 40px; padding: 0 16px; border: none; border-radius: 8px; background: #ef4444; color: #ffffff; font: 600 14px/40px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Source Han Sans SC', sans-serif; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.18); transition: background 150ms ease, box-shadow 150ms ease; } .ds-btn-danger:hover { background: #dc2626; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2); } .ds-btn-danger:focus-visible { outline: 2px solid #fca5a5; outline-offset: 2px; } .ds-btn-danger:active { background: #b91c1c; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard text field for login, binding, dish editing, and admin forms.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-label\">菜品名称</span><input class=\"ds-input\" value=\"包子\" /></label>",
+      "css": ".ds-field { display: grid; gap: 6px; font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Source Han Sans SC', sans-serif; } .ds-label { color: #4b5563; font-size: 13px; font-weight: 600; } .ds-input { height: 42px; padding: 0 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; color: #1f2937; font: 400 15px/42px -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Source Han Sans SC', sans-serif; transition: border-color 150ms ease; } .ds-input:focus { border-color: #0f5f9f; outline: none; } .ds-input:disabled { background: #f1f3f5; color: #9ca3af; }"
+    },
+    {
+      "name": "Status Tag",
+      "kind": "chip",
+      "refersTo": "status-tag",
+      "description": "Compact semantic state label for order and slot states.",
+      "html": "<span class=\"ds-status ds-status-success\">开放中</span><span class=\"ds-status ds-status-danger\">已停止</span><span class=\"ds-status ds-status-info\">已订餐</span>",
+      "css": ".ds-status { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 999px; font: 600 12px/1 -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Source Han Sans SC', sans-serif; margin-right: 6px; } .ds-status-success { background: #d1fae5; color: #047857; } .ds-status-danger { background: #fee2e2; color: #dc2626; } .ds-status-info { background: #dbeafe; color: #2563eb; }"
+    },
+    {
+      "name": "Work Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Default operational surface for forms, summaries, and grouped controls.",
+      "html": "<section class=\"ds-card\"><h3>区间统计</h3><p>选择日期后查询订餐汇总和导出任务。</p></section>",
+      "css": ".ds-card { width: 280px; padding: 14px; border: 1px solid #e5e7eb; border-radius: 10px; background: #ffffff; color: #1f2937; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04); font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Source Han Sans SC', sans-serif; } .ds-card h3 { margin: 0 0 8px; font-size: 16px; line-height: 1.25; font-weight: 700; letter-spacing: 0; } .ds-card p { margin: 0; color: #4b5563; font-size: 13px; line-height: 1.45; }"
+    },
+    {
+      "name": "Meal Tabs",
+      "kind": "nav",
+      "refersTo": "status-tag",
+      "description": "Segmented meal navigation for breakfast, lunch, and dinner.",
+      "html": "<nav class=\"ds-tabs\"><button class=\"ds-tab ds-tab-active\">早餐</button><button class=\"ds-tab\">中餐</button><button class=\"ds-tab\">晚餐</button></nav>",
+      "css": ".ds-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; width: 300px; padding: 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Source Han Sans SC', sans-serif; } .ds-tab { height: 34px; border: 0; border-radius: 999px; background: transparent; color: rgba(255, 255, 255, 0.86); font-size: 14px; font-weight: 600; transition: background 200ms ease, color 200ms ease; } .ds-tab:hover { background: rgba(255, 255, 255, 0.12); } .ds-tab:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; } .ds-tab-active { background: #ffffff; color: #0b2a4a; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08); }"
+    },
+    {
+      "name": "Meal Package Card",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Selectable dish row with image, price, and fixed quantity controls.",
+      "html": "<article class=\"ds-meal-card ds-meal-card-selected\"><div class=\"ds-meal-img\"></div><div class=\"ds-meal-main\"><strong>减脂套餐</strong><span>¥12 / 份</span><div class=\"ds-qty\"><button>-</button><b>2</b><button>+</button></div></div></article>",
+      "css": ".ds-meal-card { display: flex; gap: 8px; width: 320px; padding: 8px; border: 1px solid #e5e7eb; border-radius: 10px; background: #ffffff; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04); font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Source Han Sans SC', sans-serif; transition: border-color 180ms ease, background 180ms ease; } .ds-meal-card-selected { border-color: #0f5f9f; background: #dbeafe; } .ds-meal-img { width: 72px; height: 72px; flex: 0 0 auto; border-radius: 8px; background: linear-gradient(135deg, #e5e7eb, #f9fafb); } .ds-meal-main { min-width: 0; flex: 1; display: grid; gap: 4px; } .ds-meal-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1f2937; font-size: 15px; line-height: 1.25; } .ds-meal-main span { color: #0b2a4a; font-size: 13px; font-weight: 600; } .ds-qty { display: flex; align-items: center; gap: 2px; } .ds-qty button { width: 28px; height: 28px; border: 0; border-radius: 8px; background: #0f5f9f; color: #ffffff; font-size: 16px; font-weight: 700; } .ds-qty b { width: 38px; text-align: center; color: #1f2937; font-size: 14px; }"
+    },
+    {
+      "name": "Admin Edit Card",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Dense dish-management surface for editing meal image, name, price, unit, category, and actions.",
+      "html": "<article class=\"ds-admin-card\"><div class=\"ds-admin-top\"><div class=\"ds-admin-img\"></div><div class=\"ds-admin-fields\"><span class=\"ds-badge\">中餐</span><input value=\"红烧鸡腿\" /><div class=\"ds-inline\"><input value=\"12\" /><input value=\"份\" /><span>普通套餐</span></div></div></div><div class=\"ds-actions\"><button>更换图片</button><button class=\"ds-danger\">删除菜品</button><button class=\"ds-primary\">保存菜品</button></div></article>",
+      "css": ".ds-admin-card { width: 340px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 10px; background: #ffffff; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04); font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Source Han Sans SC', sans-serif; } .ds-admin-top { display: flex; gap: 8px; align-items: flex-start; } .ds-admin-img { width: 84px; height: 66px; border-radius: 8px; background: linear-gradient(135deg, #e5e7eb, #f9fafb); flex: 0 0 auto; } .ds-admin-fields { flex: 1; min-width: 0; display: grid; gap: 5px; } .ds-badge { justify-self: start; padding: 2px 6px; border-radius: 999px; background: #dbeafe; color: #0b2a4a; font-size: 11px; font-weight: 600; } .ds-admin-fields input { min-width: 0; height: 34px; padding: 0 10px; border: 1px solid #e5e7eb; border-radius: 8px; color: #1f2937; font-size: 13px; } .ds-admin-fields input:focus { border-color: #0f5f9f; outline: none; } .ds-inline { display: grid; grid-template-columns: 0.8fr 0.6fr 1fr; gap: 5px; align-items: center; } .ds-inline span { height: 34px; padding: 0 8px; border-radius: 8px; background: #dbeafe; color: #0b2a4a; font-size: 12px; font-weight: 600; line-height: 34px; white-space: nowrap; } .ds-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 8px; } .ds-actions button { min-width: 0; height: 32px; border: 1px solid #93c5fd; border-radius: 8px; background: #ffffff; color: #0f5f9f; font-size: 12px; font-weight: 600; } .ds-actions .ds-danger { border-color: #ef4444; background: #ef4444; color: #ffffff; } .ds-actions .ds-primary { border-color: #0f5f9f; background: #0f5f9f; color: #ffffff; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Service Desk",
+    "overview": "This system should feel like a calm internal service counter: orderly enough for administrative trust, fast enough for daily meal decisions, and warm enough to belong to a canteen rather than a command console. The visual language is restrained product UI: cool gray background, white operational surfaces, 公安蓝 authority color, amber meal hints, and compact mobile controls.\n\nThe product must feel 稳重、清晰、高效. It explicitly rejects internet marketing style, overly playful consumer app treatment, and outdated government system aesthetics. Familiar mobile patterns are not a compromise here; they are the reason officers, kitchen staff, and administrators can complete work without pausing to interpret the interface.",
+    "keyCharacteristics": [
+      "Restrained, role-aware, mobile-first product interface.",
+      "公安蓝 used for authority, current selection, and primary action only.",
+      "White cards and cool gray backgrounds create separation without visual noise.",
+      "Status, cutoff, export, and permission states are shown in plain Chinese and consistent color roles.",
+      "Dense admin views are acceptable when hierarchy makes scanning faster."
+    ],
+    "rules": [
+      {
+        "name": "The One Authority Rule",
+        "body": "Police Blue is reserved for the current task path: primary action, selected state, and admin authority. Do not use it as decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Warmth Limit Rule",
+        "body": "Meal Amber appears only where it clarifies food, deadline, or caution context. It must not become a general accent system.",
+        "section": "colors"
+      },
+      {
+        "name": "The No Marketing Gradient Rule",
+        "body": "Gradients may appear only on compact app headers already present in the mini-program. Never use them as promotional hero treatment, decorative backgrounds, or attention grabbing banners.",
+        "section": "colors"
+      },
+      {
+        "name": "The Native Utility Rule",
+        "body": "Use one system sans stack everywhere. Do not introduce display fonts, ornamental numerals, or type pairings for flavor.",
+        "section": "typography"
+      },
+      {
+        "name": "The Plain Chinese Rule",
+        "body": "Labels must be direct and operational: 提交本时段订单, 执行导出, 停止订餐, 保存菜品. Avoid promotional phrases and clever copy.",
+        "section": "typography"
+      },
+      {
+        "name": "The Border First Rule",
+        "body": "Use borders and tonal surfaces before adding stronger shadows. If a shadow is noticeable before the content is read, it is too strong.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep the product 稳重、清晰、高效 through restrained color, native typography, and direct labels.",
+      "Do make ordering, managing slots, checking totals, and exporting data reachable through predictable flows.",
+      "Do use Police Blue for primary action, selected state, and trusted admin authority.",
+      "Do use semantic tags for open, closed, verified, cancelled, expired, loading, and error states.",
+      "Do keep Chinese text readable on small phone screens with fixed control dimensions and clear wrapping behavior.",
+      "Do preserve enough warmth for a daily meal service through food imagery, Meal Amber hints, and plain helpful copy."
+    ],
+    "donts": [
+      "Don't create an internet marketing style, exaggerated hero treatment, promotional copy, loud gradients, or sales-driven visual language.",
+      "Don't make the interface too playful: no cute icons, novelty motion, celebratory styling, or childish visual tone.",
+      "Don't reproduce outdated government system aesthetics: no cramped legacy tables, weak hierarchy, stale gray blocks, or bureaucratically heavy copy.",
+      "Don't use side-stripe borders such as border-left or border-right greater than 1px as a colored accent. Replace them with full borders, soft status backgrounds, icons, or clear status tags.",
+      "Don't use gradient text, decorative glassmorphism, or modal-first flows.",
+      "Don't let admin density become visual clutter. If a screen carries many controls, group them by task and keep action hierarchy explicit."
+    ]
+  }
+}

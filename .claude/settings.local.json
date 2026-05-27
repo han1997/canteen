@@ -46,7 +46,8 @@
       "Bash(mysql *)",
       "Bash(node -c ../miniprogram/pages/admin-meals/index.js)",
       "Bash(node -c ../miniprogram/services/api.js)",
-      "Bash(node -c ../miniprogram/pages/admin-users/index.js)"
+      "Bash(node -c ../miniprogram/pages/admin-users/index.js)",
+      "Bash(node -c ../miniprogram/pages/home/index.js)"
     ]
   }
 }

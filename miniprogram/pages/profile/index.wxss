@@ -1,34 +1,44 @@
+/* =============================================
+   个人中心
+   ============================================= */
 .action-row {
-  margin-top: 16rpx;
-  flex-wrap: wrap;
+  margin-top: 18rpx;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10rpx;
 }
 
 .action-row .subtle-btn,
-.action-row .warn-btn {
-  margin-left: 0;
+.action-row .warn-btn,
+.action-row .primary-btn {
+  margin: 0;
+  height: 80rpx;
+  line-height: 80rpx;
+  font-size: 26rpx;
 }
 
 .link {
-  color: #0B2A4A;
+  color: var(--color-primary);
   font-size: 26rpx;
   padding: 6rpx 8rpx;
 }
 
 .recent-order-row {
-  padding: 16rpx 0;
+  padding: 18rpx 0;
 }
 
 .recent-order-row + .recent-order-row {
-  border-top: 1rpx solid #eef1f6;
+  border-top: 1rpx solid var(--color-divider);
 }
 
 .recent-order-row .order-no {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 28rpx;
+  color: var(--color-text);
 }
 
 .recent-order-row .small {
   font-size: 24rpx;
   margin-top: 4rpx;
+  color: var(--color-text-muted);
 }

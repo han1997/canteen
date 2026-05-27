@@ -3,7 +3,7 @@
     <view class="space-between home-head">
       <view>
         <view class="section-title">订餐主页</view>
-        <view class="muted">{{profile.real_name}}（{{profile.police_no}}）</view>
+        <view class="muted">{{profile.real_name}}（{{profile.police_no || profile.mobile}}）</view>
       </view>
       <view class="inline top-actions">
         <view class="icon-action" bindtap="goProfile">
@@ -26,87 +26,112 @@
         <view class="date-value">{{mealDate}}</view>
       </picker>
     </view>
+
+    <!-- 顶部餐别 tab -->
+    <view class="meal-tabs">
+      <view
+        wx:for="{{mealTabs}}"
+        wx:key="value"
+        wx:for-index="tabIndex"
+        class="meal-tab {{activeMealIndex === tabIndex ? 'meal-tab-active' : ''}}"
+        data-index="{{tabIndex}}"
+        bindtap="onMealTabChange"
+      >
+        {{item.label}}
+      </view>
+    </view>
   </view>
 
   <view wx:if="{{loading}}" class="card">
     <view class="empty-text">加载中...</view>
   </view>
 
-  <view wx:elif="{{!slots.length}}" class="card">
-    <view class="empty-text">该日期暂无可订餐时段</view>
+  <view wx:elif="{{!activeSlot}}" class="card">
+    <view class="empty-text">该日期暂无{{mealTabs[activeMealIndex].label}}时段</view>
   </view>
 
-  <block wx:for="{{slots}}" wx:key="id" wx:for-item="slot" wx:for-index="slotIndex">
-    <view class="card slot-card">
+  <block wx:else>
+    <!-- 订单状态栏 -->
+    <view class="card slot-status-card">
       <view class="space-between">
-        <view class="slot-title">{{slot.mealTypeLabel}}</view>
-        <text class="{{slot.canBook ? 'status-tag status-verified' : 'status-tag status-cancelled'}}">
-          {{slot.slotStatus}}
+        <view class="slot-title">{{activeSlot.mealTypeLabel}}</view>
+        <text class="{{activeSlot.canBook ? 'status-tag status-verified' : 'status-tag status-cancelled'}}">
+          {{activeSlot.slotStatus}}
         </text>
       </view>
-      <view class="muted">截止时间：{{slot.deadlineText}}</view>
-      <view wx:if="{{slot.selectedOrder}}" class="order-tip">
-        <text>当前订单：{{slot.selectedOrder.orderNo}}</text>
-        <text class="muted">（{{slot.selectedOrder.status}}）</text>
+      <view wx:if="{{activeSlot.bookingDeadline}}" class="muted">截止时间：{{activeSlot.deadlineText}}</view>
+      <view wx:if="{{activeSlot.selectedOrder}}" class="order-tip">
+        <text>当前订单：{{activeSlot.selectedOrder.orderNo}}</text>
+        <text class="muted">（{{activeSlot.selectedOrder.status}}）</text>
       </view>
-      <view wx:if="{{slot.isBreakfast}}" class="breakfast-tip">早餐为单点，可多种叠加下单</view>
+      <view wx:if="{{activeSlot.isBreakfast}}" class="breakfast-tip">早餐为单点，可多种叠加下单</view>
+    </view>
 
-      <input
-        wx:if="{{false}}"
-        class="input"
-        placeholder="备注（可选，如：少盐）"
-        data-slot-index="{{slotIndex}}"
-        value="{{slot.note}}"
-        bindinput="onNoteInput"
-      />
+    <!-- 左侧分类 nav + 右侧菜品列表 -->
+    <view class="meal-body">
+      <!-- 左侧分类导航：早餐不显示 -->
+      <view wx:if="{{!activeSlot.isBreakfast}}" class="category-nav">
+        <view
+          wx:for="{{categoryNavs}}"
+          wx:key="value"
+          wx:for-index="catIndex"
+          class="category-item {{activeCategoryIndex === catIndex ? 'category-item-active' : ''}}"
+          data-index="{{catIndex}}"
+          bindtap="onCategoryChange"
+        >
+          {{item.label}}
+        </view>
+      </view>
 
-      <block wx:for="{{slot.packages}}" wx:key="id" wx:for-item="pkg" wx:for-index="pkgIndex">
-        <view class="package-card {{pkg.qty > 0 ? 'package-selected' : ''}}">
-          <image
-            class="package-image"
-            src="{{pkg.imageUrl}}"
-            mode="aspectFill"
-            data-slot-index="{{slotIndex}}"
-            data-package-index="{{pkgIndex}}"
-            binderror="onPackageImageError"
-            lazy-load="true"
-          />
-          <view class="pkg-main">
-            <view class="space-between">
+      <!-- 右侧菜品列表 -->
+      <view class="meal-list {{activeSlot.isBreakfast ? 'meal-list-full' : ''}}">
+        <view wx:if="{{!activePackages.length}}" class="empty-text">
+          {{activeSlot.isBreakfast ? '暂无菜品' : '该分类下暂无菜品'}}
+        </view>
+        <block wx:for="{{activePackages}}" wx:key="id" wx:for-item="pkg" wx:for-index="pkgIndex">
+          <view class="package-card {{pkg.qty > 0 ? 'package-selected' : ''}}">
+            <image
+              class="package-image"
+              src="{{pkg.imageUrl}}"
+              mode="aspectFill"
+              data-package-index="{{pkgIndex}}"
+              binderror="onPackageImageError"
+              lazy-load="true"
+            />
+            <view class="pkg-main">
               <view class="pkg-title">{{pkg.packageName}}</view>
-              <text class="pkg-cat">{{slot.isBreakfast ? '单点' : pkg.categoryLabel}}</text>
-            </view>
-            <view class="price-line">¥{{pkg.price || 0}}</view>
-            <view class="qty-row">
-              <view
-                class="qty-btn {{!slot.canBook ? 'qty-disabled' : ''}}"
-                data-slot-index="{{slotIndex}}"
-                data-package-index="{{pkgIndex}}"
-                data-delta="-1"
-                bindtap="adjustQty"
-              >
-                -
-              </view>
-              <view class="qty-value">{{pkg.qty}}</view>
-              <view
-                class="qty-btn {{!slot.canBook ? 'qty-disabled' : ''}}"
-                data-slot-index="{{slotIndex}}"
-                data-package-index="{{pkgIndex}}"
-                data-delta="1"
-                bindtap="adjustQty"
-              >
-                +
+              <view class="price-line">¥{{pkg.price || 0}} / {{pkg.unit}}</view>
+              <view class="qty-row">
+                <view
+                  class="qty-btn {{!activeSlot.canBook ? 'qty-disabled' : ''}}"
+                  data-package-id="{{pkg.id}}"
+                  data-delta="-1"
+                  bindtap="adjustQty"
+                >
+                  -
+                </view>
+                <view class="qty-value">{{pkg.qty}}</view>
+                <view
+                  class="qty-btn {{!activeSlot.canBook ? 'qty-disabled' : ''}}"
+                  data-package-id="{{pkg.id}}"
+                  data-delta="1"
+                  bindtap="adjustQty"
+                >
+                  +
+                </view>
               </view>
             </view>
           </view>
-        </view>
-      </block>
+        </block>
+      </view>
+    </view>
 
+    <!-- 提交按钮 -->
+    <view class="submit-bar">
       <button
         class="primary-btn"
-        loading="{{placing && placingSlotId === slot.id}}"
-        disabled="{{!slot.canBook || placing}}"
-        data-slot-index="{{slotIndex}}"
+        loading="{{placing && placingSlotId === activeSlot.id}}"
+        disabled="{{!activeSlot.canBook || placing}}"
         bindtap="submitSlotOrder"
       >
         提交本时段订单

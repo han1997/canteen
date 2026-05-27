@@ -1,66 +1,77 @@
+/* =============================================
+   用户管理页
+   ============================================= */
 .half-btn {
   flex: 1;
-  margin-right: 10rpx;
-}
-
-.half-btn:last-child {
-  margin-right: 0;
+  margin: 0;
 }
 
 .create-toggle {
   margin-top: 14rpx;
 }
 
-.picker-value {
-  background: linear-gradient(135deg, #eef4fd 0%, #e0ebf9 100%);
-  border-radius: 12rpx;
-  padding: 16rpx 18rpx;
-  color: #0b2a4a;
-  margin-bottom: 16rpx;
-}
-
+/* 用户卡片 */
 .user-card {
-  padding-top: 18rpx;
-  border-left: 8rpx solid #0b2a4a;
+  padding: 22rpx 24rpx;
 }
 
 .user-name {
-  font-size: 28rpx;
+  font-size: 30rpx;
   font-weight: 700;
-  color: #0b2a4a;
+  color: var(--color-text);
   margin-bottom: 6rpx;
 }
 
 .action-row {
-  margin-top: 14rpx;
+  margin-top: 16rpx;
   display: grid;
   grid-template-columns: 1fr auto auto;
   gap: 10rpx;
   align-items: center;
 }
 
+.action-row button {
+  margin: 0;
+  height: 64rpx;
+  line-height: 64rpx;
+  font-size: 24rpx;
+  padding: 0 18rpx;
+  white-space: nowrap;
+  border-radius: var(--radius-md);
+}
+
 .picker-role {
   min-width: 0;
-  padding: 10rpx 14rpx;
-  border-radius: 12rpx;
-  background: #edf4fd;
-  color: #0b2a4a;
+  padding: 14rpx 18rpx;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-dark);
+  font-size: 24rpx;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: center;
 }
 
-.action-row button {
-  margin: 0;
-  white-space: nowrap;
-}
-
+/* 编辑表单 */
 .edit-form {
   padding: 4rpx 0;
 }
 
+.edit-form .section-title {
+  font-size: 28rpx;
+  margin-bottom: 14rpx;
+  color: var(--color-primary-dark);
+}
+
 .hint-small {
   font-size: 22rpx;
+  color: var(--color-text-muted);
   margin-top: -8rpx;
-  margin-bottom: 8rpx;
+  margin-bottom: 14rpx;
+}
+
+.edit-form .inline {
+  gap: 12rpx;
 }

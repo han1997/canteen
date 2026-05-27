@@ -15,6 +15,20 @@ const ORDER_STATUS_LABEL = {
   cancelled: "已取消"
 };
 
+// 餐别 tab：早餐 / 中餐 / 晚餐
+const MEAL_TAB_OPTIONS = [
+  { label: "早餐", value: "breakfast" },
+  { label: "中餐", value: "lunch" },
+  { label: "晚餐", value: "dinner" }
+];
+
+// 分类 nav：普通套餐 / 减脂餐 / 自选菜
+const CATEGORY_NAV_OPTIONS = [
+  { label: "普通套餐", value: "normal" },
+  { label: "减脂餐", value: "fat_loss" },
+  { label: "自选菜", value: "self_pick" }
+];
+
 function toast(title, icon) {
   wx.showToast({
     title,
@@ -73,7 +87,16 @@ Page({
     loading: false,
     placing: false,
     placingSlotId: 0,
-    canManage: false
+    canManage: false,
+    // 新增：餐别 tab 与分类 nav
+    mealTabs: MEAL_TAB_OPTIONS,
+    activeMealIndex: 0,
+    categoryNavs: CATEGORY_NAV_OPTIONS,
+    activeCategoryIndex: 0,
+    // 当前餐别对应的 slot（可能为 null：该日期未开放此餐别）
+    activeSlot: null,
+    // 当前餐别 + 当前分类过滤出的菜品
+    activePackages: []
   },
 
   onLoad() {
@@ -172,6 +195,7 @@ Page({
         this.setData({
           slots: formattedSlots
         });
+        this.refreshActiveView();
         this._lastLoadedAt = Date.now();
       })
       .catch((err) => {
@@ -205,6 +229,7 @@ Page({
       categoryLabel: CATEGORY_LABEL[pkg.meal_category] || pkg.meal_category,
       imageUrl: toMealImageUrl(pkg.image_url),
       price: pkg.price,
+      unit: pkg.unit || "份",
       calories: pkg.calories,
       proteinG: pkg.protein_g,
       carbsG: pkg.carbs_g,
@@ -233,11 +258,57 @@ Page({
   },
 
   onPackageImageError(e) {
-    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
-    const packageIndex = Number(e.currentTarget.dataset.packageIndex);
+    const pkgIndex = Number(e.currentTarget.dataset.packageIndex);
+    if (Number.isNaN(pkgIndex)) {
+      return;
+    }
     this.setData({
-      [`slots[${slotIndex}].packages[${packageIndex}].imageUrl`]: DEFAULT_MEAL_IMAGE_LOCAL
+      [`activePackages[${pkgIndex}].imageUrl`]: DEFAULT_MEAL_IMAGE_LOCAL
     });
+  },
+
+  // 根据 activeMealIndex 和 activeCategoryIndex 重新计算 activeSlot 和 activePackages
+  refreshActiveView() {
+    const mealType = MEAL_TAB_OPTIONS[this.data.activeMealIndex].value;
+    const slot = this.data.slots.find((s) => s.mealType === mealType) || null;
+
+    // 早餐没有分类概念，把所有菜品都归到 normal
+    const isBreakfast = mealType === "breakfast";
+    const targetCategory = isBreakfast
+      ? "normal"
+      : CATEGORY_NAV_OPTIONS[this.data.activeCategoryIndex].value;
+
+    const packages = slot
+      ? (slot.packages || []).filter((pkg) => {
+          if (isBreakfast) {
+            return true;
+          }
+          return (pkg.mealCategory || "normal") === targetCategory;
+        })
+      : [];
+
+    this.setData({
+      activeSlot: slot,
+      activePackages: packages
+    });
+  },
+
+  onMealTabChange(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    if (Number.isNaN(idx) || idx === this.data.activeMealIndex) {
+      return;
+    }
+    this.setData({ activeMealIndex: idx });
+    this.refreshActiveView();
+  },
+
+  onCategoryChange(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    if (Number.isNaN(idx) || idx === this.data.activeCategoryIndex) {
+      return;
+    }
+    this.setData({ activeCategoryIndex: idx });
+    this.refreshActiveView();
   },
 
   onDateChange(e) {
@@ -248,38 +319,50 @@ Page({
   },
 
   onNoteInput(e) {
-    const key = `slots[${e.currentTarget.dataset.slotIndex}].note`;
-    this.setData({
-      [key]: e.detail.value
-    });
+    // 留空：备注框已隐藏
   },
 
+  // 数量调整：用 packageId 定位（因为列表是过滤后的）
   adjustQty(e) {
-    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
-    const packageIndex = Number(e.currentTarget.dataset.packageIndex);
+    if (!this.data.activeSlot || !this.data.activeSlot.canBook) {
+      return;
+    }
+    const packageId = Number(e.currentTarget.dataset.packageId);
     const delta = Number(e.currentTarget.dataset.delta);
-    const slot = this.data.slots[slotIndex];
-    if (!slot || !slot.canBook) {
+    if (!packageId || Number.isNaN(delta)) {
       return;
     }
 
-    const current = toInt(slot.packages[packageIndex].qty);
+    const slotIndex = this.data.slots.findIndex((s) => s.id === this.data.activeSlot.id);
+    if (slotIndex < 0) {
+      return;
+    }
+    const packages = this.data.slots[slotIndex].packages || [];
+    const pkgIndex = packages.findIndex((p) => p.id === packageId);
+    if (pkgIndex < 0) {
+      return;
+    }
+
+    const current = toInt(packages[pkgIndex].qty);
     let next = current + delta;
-    if (next < 0) {
-      next = 0;
+    if (next < 0) next = 0;
+    if (next > 99) next = 99;
+
+    // 同时更新 slots 和 activePackages
+    const activePkgIndex = (this.data.activePackages || []).findIndex((p) => p.id === packageId);
+    const updates = {
+      [`slots[${slotIndex}].packages[${pkgIndex}].qty`]: next
+    };
+    if (activePkgIndex >= 0) {
+      updates[`activePackages[${activePkgIndex}].qty`] = next;
     }
-    if (next > 99) {
-      next = 99;
-    }
-    this.setData({
-      [`slots[${slotIndex}].packages[${packageIndex}].qty`]: next
-    });
+    this.setData(updates);
   },
 
-  async submitSlotOrder(e) {
-    const slotIndex = Number(e.currentTarget.dataset.slotIndex);
-    const slot = this.data.slots[slotIndex];
+  async submitSlotOrder() {
+    const slot = this.data.activeSlot;
     if (!slot) {
+      toast("当前日期暂无该餐别");
       return;
     }
     if (!slot.canBook) {
@@ -287,7 +370,14 @@ Page({
       return;
     }
 
-    const selections = (slot.packages || [])
+    // 必须从 slots 中读取完整的 packages（包括其他分类下被选中的菜品）
+    const slotIndex = this.data.slots.findIndex((s) => s.id === slot.id);
+    if (slotIndex < 0) {
+      return;
+    }
+    const allPackages = this.data.slots[slotIndex].packages || [];
+
+    const selections = allPackages
       .filter((pkg) => toInt(pkg.qty) > 0)
       .map((pkg) => ({
         package_id: pkg.id,
@@ -306,7 +396,7 @@ Page({
       const order = await api.createOrder({
         slot_id: slot.id,
         selections,
-        note: slot.note || null
+        note: null
       });
       toast(`下单成功：${order.order_no}`, "success");
       await this.loadData({ force: true, silent: false });

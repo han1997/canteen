@@ -4,6 +4,135 @@
 
 ## 2026-05-26
 
+### 重设计：建立统一设计系统，全站视觉风格升级
+
+**动机**：
+- 之前各页面样式各自定义，色调（深蓝、橙色、紫色等）混杂，缺乏统一感
+- 卡片阴影、圆角、按钮等公共组件在不同页面差异较大
+- 用户反馈"界面割裂"，缺少品牌识别度
+
+**设计原则**：
+- **主色**：森林绿 `#2d6a4f`（健康、专业、与食物相关）
+- **背景**：浅灰 `#f5f7f8` + 白色卡片
+- **强调色**：暖橙 `#f59e0b`（食欲、提示）
+- 圆润的卡片（16-20rpx 圆角）
+- 轻量阴影（避免厚重感）
+- 清晰的字号层级（22/24/26/28/30/32rpx）
+
+**变更**：
+
+1. **`miniprogram/app.wxss`**（全局设计系统）：
+   - 引入 CSS 变量定义 design tokens：
+     - `--color-primary` / `--color-primary-dark` / `--color-primary-soft` / `--color-primary-line`
+     - `--color-accent` / `--color-success` / `--color-warning` / `--color-danger`
+     - `--color-text` / `--color-text-secondary` / `--color-text-muted`
+     - `--color-border` / `--color-divider`
+     - `--radius-sm/md/lg/xl`、`--shadow-sm/md/lg`
+   - 重写 `.card` / `.primary-btn` / `.warn-btn` / `.subtle-btn` / `.input` / `.status-tag` / `.section-title` 等公共组件
+   - 删除冗余的渐变背景（原有 3 层 radial-gradient）
+   - 新增 `.ghost-btn`（透明描边按钮）、`.divider`（分隔线）、`.text-primary/accent/secondary`（文本工具类）
+
+2. **`pages/login/`**（登录页）：
+   - 品牌卡片改为深绿渐变 + 居中 logo `食` + 标语「健康饮食 · 准时供应」
+   - 模式切换器改为药丸形（pill）
+   - 提示文字改为暖黄色 callout 样式
+
+3. **`pages/home/`**（订餐主页）：
+   - hero 卡片改为深绿渐变，所有顶部元素白色
+   - 餐别 tab 改为药丸形切换器（白底深绿字 / 半透明白字）
+   - 日期选择器改为药丸形圆角
+   - 左侧分类 nav 项激活态改为实心深绿
+   - 菜品卡片缩小图片到 144rpx，选中态用主色淡背景
+   - 数量按钮统一为深绿色
+
+4. **`pages/admin-meals/`**（菜品管理）：
+   - hero 卡片采用与 home 一致的深绿渐变
+   - 「订餐开关」面板改为半透明白色叠加
+   - 餐别 tab、日期 tab 统一为药丸形切换器
+   - 菜品卡片移除花哨渐变，统一白底
+   - 适用餐别徽章改为主色淡背景
+   - 新增菜品卡片改为绿色虚线边框
+
+5. **`pages/admin-users/`**（用户管理）：
+   - 用户名字号增大到 30rpx
+   - 角色 picker 改为主色淡背景药丸样式
+   - 操作按钮统一高度 64rpx
+
+6. **`pages/admin-stats/`**（统计页）：
+   - 顶部按钮改为主色淡背景
+   - 指标数字字号增大到 40rpx，加重字重
+   - 统计行边框统一为 `--color-divider`
+
+7. **`pages/my-orders/`**（我的订单）：
+   - 订单卡片左侧改为 6rpx 圆角竖条（替代原 8rpx 直边）
+   - 菜品标签改为主色淡背景
+
+8. **`pages/profile/`**（个人中心）：
+   - 按钮行改为 2 列 grid，统一高度 80rpx
+
+**保留**：
+- 所有功能完全保留，仅视觉层面调整
+- 状态色（success 绿、warning 橙、danger 红、info 蓝）保持语义化
+- 早餐提示等暖色 callout 保留，避免全绿单调
+
+**注意**：
+- CSS 自定义属性在微信小程序所有版本均支持
+- 部分页面（home 等）仍保留私有样式覆盖全局，但都引用 design tokens
+- 旧的硬编码颜色 `#0b2a4a` / `#1d4d82` 等已被替换为变量
+
+---
+
+## 2026-05-26
+
+### 重构：订餐主页布局（顶部餐别 tab + 左侧分类 nav + 右侧菜品列表）
+
+**动机**：
+- 之前订餐主页把当日早/中/晚三个时段全部纵向铺开，菜品多时滑动距离很长
+- 中餐/晚餐内菜品按"普通套餐 / 减脂餐 / 自选菜"混在一起，用户难以筛选
+- 一次只点一餐，纵向多 slot 卡片冗余
+
+**新布局**：
+- **顶部**：早餐 / 中餐 / 晚餐 三个 tab（一次切一餐）
+- **左侧**：普通套餐 / 减脂餐 / 自选菜 三个分类（仅中餐/晚餐显示，早餐无分类）
+- **右侧**：当前餐别 + 当前分类过滤后的菜品列表
+- **底部**：单个「提交本时段订单」按钮
+
+**变更**（`miniprogram/pages/home/`）：
+
+1. **`index.js`**：
+   - 新增 `MEAL_TAB_OPTIONS` 和 `CATEGORY_NAV_OPTIONS` 常量
+   - `data` 新增 `activeMealIndex` / `activeCategoryIndex` / `activeSlot` / `activePackages`
+   - 新增 `refreshActiveView()` 方法：根据 tab + nav 重新过滤菜品
+   - 新增 `onMealTabChange()` / `onCategoryChange()` 切换处理
+   - `adjustQty()` 改为通过 `package_id` 定位（因为列表是过滤后的），同步更新 `slots` 和 `activePackages`
+   - `submitSlotOrder()` 从 `data-slot-index` 改为读取 `activeSlot`，但提交时从原始 `slots` 收集所有分类的数量（其他分类已选菜品不丢）
+   - 菜品对象增加 `unit` 字段（与后端 unit 同步）
+
+2. **`index.wxml`**：
+   - 顶部 hero-card 内新增 `.meal-tabs`（3 列 grid）
+   - 单个状态卡片显示当前时段的状态、截止时间、已有订单
+   - `.meal-body` 改为 flex 横向：左侧 `.category-nav` + 右侧 `.meal-list`
+   - 早餐时隐藏左侧分类导航
+   - 菜品卡片显示 `¥单价 / 单位`（如 `¥1.5 / 个`）
+   - 单条提交按钮放在 `.submit-bar`
+
+3. **`index.wxss`**：
+   - 新增 `.meal-tabs` / `.meal-tab` / `.meal-tab-active`（与 admin-meals 同色调）
+   - 新增 `.meal-body` flex 横向布局，`.category-nav` 160rpx 宽
+   - 新增 `.category-item` / `.category-item-active`（左侧 6rpx 强调边）
+   - `.meal-list` flex:1，菜品卡片缩小图片到 140rpx
+   - 菜品标题 `text-overflow: ellipsis` 防止过长换行
+
+**注意**：
+- 多分类下选数量：用户在「普通套餐」选了 2 份米饭，切到「减脂餐」选 1 份沙拉，提交时两个菜品都会一起下单
+- 历史订单数据通过 `package_name` 在 `slots[*].packages` 中匹配回填 `qty`，与新布局兼容
+- 早餐保持单点逻辑，不显示左侧 nav 但仍在「品类显示」上方提示「早餐为单点，可多种叠加下单」
+- 备注框已彻底从 UI 移除（之前是 wx:if="{{false}}" 隐藏）
+
+---
+
+## 2026-05-26
+
 ### 新增：菜品支持自定义单位（默认"份"）
 
 **动机**：
