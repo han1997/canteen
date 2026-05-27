@@ -28,6 +28,28 @@ class AdminUserStatusUpdateRequest(BaseModel):
     status: str = Field(pattern="^(active|disabled)$")
 
 
+class AdminUserUpdateRequest(BaseModel):
+    """编辑用户基础信息：警号、姓名、部门、手机号（均为可选，未提供则不更新）。
+    若同时提供 police_no 和 mobile 且都设为空，会校验失败。"""
+    police_no: str | None = Field(default=None, max_length=32)
+    real_name: str | None = Field(default=None, min_length=2, max_length=64)
+    dept_name: str | None = Field(default=None, max_length=128)
+    mobile: str | None = Field(default=None, max_length=20)
+
+    @model_validator(mode="after")
+    def _normalize(self) -> "AdminUserUpdateRequest":
+        # 空字符串转 None（视为"清空"），但完全没传则保持 None（视为"不修改"）
+        if self.police_no is not None:
+            self.police_no = self.police_no.strip() or None
+        if self.real_name is not None:
+            self.real_name = self.real_name.strip()
+        if self.dept_name is not None:
+            self.dept_name = self.dept_name.strip()
+        if self.mobile is not None:
+            self.mobile = self.mobile.strip() or None
+        return self
+
+
 class AdminUserOut(BaseModel):
     id: int
     police_no: str | None

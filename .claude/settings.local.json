@@ -44,7 +44,9 @@
       "Bash(python -c \"import ast; [ast.parse\\(open\\(p, encoding='utf-8'\\).read\\(\\)\\) for p in ['app/api/v1/admin.py', 'app/core/config.py', 'app/db/init_db.py']]; print\\('所有文件语法检查通过'\\)\")",
       "Bash(python *)",
       "Bash(mysql *)",
-      "Bash(node -c ../miniprogram/pages/admin-meals/index.js)"
+      "Bash(node -c ../miniprogram/pages/admin-meals/index.js)",
+      "Bash(node -c ../miniprogram/services/api.js)",
+      "Bash(node -c ../miniprogram/pages/admin-users/index.js)"
     ]
   }
 }

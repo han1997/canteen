@@ -35,6 +35,7 @@ from app.schemas.admin import (
     AdminUserOut,
     AdminUserRoleUpdateRequest,
     AdminUserStatusUpdateRequest,
+    AdminUserUpdateRequest,
 )
 from app.schemas.admin_meal import (
     AdminMealPackageCreateRequest,
@@ -326,6 +327,91 @@ async def bulk_import_users(
     db.commit()
 
     return AdminBulkImportResult(created=created, skipped=skipped, errors=errors)
+
+
+@router.patch("/users/{user_id}", response_model=AdminUserOut, dependencies=USER_MANAGE_DEPS)
+def update_user(
+    user_id: int,
+    payload: AdminUserUpdateRequest,
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """编辑用户基础信息：警号、姓名、部门、手机号。
+    警号与手机号必须至少保留一个非空。"""
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    changes: dict = {}
+
+    # 计算更新后的 police_no 和 mobile，校验至少保留一个
+    new_police_no = payload.police_no if payload.police_no is not None else user.police_no
+    new_mobile = payload.mobile if payload.mobile is not None else user.mobile
+    if not new_police_no and not new_mobile:
+        raise HTTPException(status_code=400, detail="警号与手机号至少保留一个")
+
+    # 警号唯一性校验
+    if payload.police_no is not None and payload.police_no != user.police_no:
+        if payload.police_no:
+            exists = db.scalar(
+                select(User).where(User.police_no == payload.police_no, User.id != user_id)
+            )
+            if exists:
+                raise HTTPException(status_code=400, detail="警号已被其他用户占用")
+        changes["police_no"] = {"old": user.police_no, "new": payload.police_no}
+        user.police_no = payload.police_no
+
+    # 手机号唯一性校验
+    if payload.mobile is not None and payload.mobile != user.mobile:
+        if payload.mobile:
+            exists = db.scalar(
+                select(User).where(User.mobile == payload.mobile, User.id != user_id)
+            )
+            if exists:
+                raise HTTPException(status_code=400, detail="手机号已被其他用户占用")
+        changes["mobile"] = {"old": user.mobile, "new": payload.mobile}
+        user.mobile = payload.mobile
+
+    # 姓名
+    if payload.real_name is not None and payload.real_name != user.real_name:
+        if not payload.real_name:
+            raise HTTPException(status_code=400, detail="姓名不能为空")
+        changes["real_name"] = {"old": user.real_name, "new": payload.real_name}
+        user.real_name = payload.real_name
+
+    # 部门
+    if payload.dept_name is not None and payload.dept_name != user.dept_name:
+        if not payload.dept_name:
+            raise HTTPException(status_code=400, detail="部门不能为空")
+        changes["dept_name"] = {"old": user.dept_name, "new": payload.dept_name}
+        user.dept_name = payload.dept_name
+
+    if not changes:
+        return user
+
+    try:
+        write_audit(
+            db,
+            actor_user_id=current_user.id,
+            action="UPDATE_USER_INFO",
+            target_type="user",
+            target_id=str(user.id),
+            request_ip=request.client.host if request.client else None,
+            detail_json=changes,
+        )
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        error_msg = str(e.orig) if e.orig else str(e)
+        if "police_no" in error_msg:
+            raise HTTPException(status_code=409, detail="警号已被占用")
+        if "mobile" in error_msg:
+            raise HTTPException(status_code=409, detail="手机号已被占用")
+        raise HTTPException(status_code=409, detail=f"数据冲突：{error_msg}")
+
+    db.refresh(user)
+    return user
 
 
 @router.patch("/users/{user_id}/role", response_model=ApiMessage, dependencies=USER_MANAGE_DEPS)

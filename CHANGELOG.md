@@ -4,6 +4,47 @@
 
 ## 2026-05-26
 
+### 新增：用户管理支持编辑基础信息
+
+**动机**：
+- 之前用户管理页只能修改角色和启用/禁用状态，无法修改警号、姓名、部门、手机号等基础信息
+- 录入错误时只能删除重建，体验差
+
+**变更**：
+
+1. **后端 schema**（`backend/app/schemas/admin.py`）：
+   - 新增 `AdminUserUpdateRequest`：所有字段均可选（未提供则不更新；提供空串则清空）
+   - 通过 `@model_validator` 自动 strip 字段，将空串归一化为 None
+
+2. **后端接口**（`backend/app/api/v1/admin.py`）：
+   - 新增 `PATCH /admin/users/{user_id}` 接口（需 `admin`/`super_admin` 角色）
+   - 校验：
+     - 警号与手机号至少保留一个非空
+     - 警号/手机号唯一性（与其他用户冲突时返回 400）
+     - 姓名/部门不能改为空
+   - 审计日志记录每个字段的 old/new 值（action: `UPDATE_USER_INFO`）
+   - 捕获 `IntegrityError` 兜底处理并发冲突
+
+3. **小程序 API**（`miniprogram/services/api.js`）：
+   - 新增 `updateAdminUser(userId, payload)` 方法
+
+4. **小程序 UI**（`miniprogram/pages/admin-users/`）：
+   - 用户卡片新增「编辑」按钮（与角色 picker、启用/禁用按钮并列）
+   - 点击编辑后，卡片展开为编辑表单（4 个输入框 + 保存/取消）
+   - 显示手机号字段（之前 UI 没显示）
+   - `action-row` 改为 3 列 grid 布局，避免按钮换行
+   - `picker-role` 加 `text-overflow: ellipsis` 防长角色名挤压
+   - 警号若为空，标题显示「无警号」
+
+**注意**：
+- 编辑表单的输入框默认填充当前值；清空警号输入框后保存 = 清空警号
+- 警号或手机号至少保留一个，否则提交时被服务端拒绝
+- 修改警号会同时影响该用户的登录账号（前端已用 `user.id` 作为 JWT subject，旧 token 仍可用）
+
+---
+
+## 2026-05-26
+
 ### 代码审查修复：性能优化与 UX 改进
 
 **动机**：

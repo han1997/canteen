@@ -175,6 +175,14 @@ function updateAdminUserStatus(userId, status) {
   });
 }
 
+function updateAdminUser(userId, payload) {
+  return request({
+    url: `/admin/users/${userId}`,
+    method: "PATCH",
+    data: payload
+  });
+}
+
 function getTodayDashboard(targetDate) {
   return request({
     url: "/admin/dashboard/today",
@@ -346,6 +354,7 @@ module.exports = {
   listAdminUsers,
   createAdminUser,
   bulkImportUsers,
+  updateAdminUser,
   updateAdminUserRole,
   updateAdminUserStatus,
   getTodayDashboard,

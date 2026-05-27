@@ -31,7 +31,14 @@ Page({
     createDeptName: "祁门县公安局",
     createMobile: "",
     createRoleIndex: 0,
-    createPassword: ""
+    createPassword: "",
+    // 编辑相关
+    editingUserId: null,
+    editPoliceNo: "",
+    editRealName: "",
+    editDeptName: "",
+    editMobile: "",
+    saving: false
   },
 
   async onShow() {
@@ -117,6 +124,7 @@ Page({
       policeNo: user.police_no,
       realName: user.real_name,
       deptName: user.dept_name,
+      mobile: user.mobile || "",
       role: user.role,
       roleLabel: ROLE_LABEL[user.role] || user.role,
       roleIndex: this.roleIndexByValue(user.role),
@@ -207,6 +215,79 @@ Page({
       await this.loadUsers();
     } catch (err) {
       toast(err.message || "更新状态失败");
+    }
+  },
+
+  startEditUser(e) {
+    const userId = Number(e.currentTarget.dataset.userId);
+    const user = this.data.users.find((u) => u.id === userId);
+    if (!user) {
+      return;
+    }
+    this.setData({
+      editingUserId: userId,
+      editPoliceNo: user.policeNo || "",
+      editRealName: user.realName || "",
+      editDeptName: user.deptName || "",
+      editMobile: user.mobile || ""
+    });
+  },
+
+  cancelEditUser() {
+    this.setData({
+      editingUserId: null,
+      editPoliceNo: "",
+      editRealName: "",
+      editDeptName: "",
+      editMobile: ""
+    });
+  },
+
+  onEditInput(e) {
+    const field = e.currentTarget.dataset.field;
+    this.setData({
+      [field]: e.detail.value
+    });
+  },
+
+  async submitEditUser() {
+    const userId = this.data.editingUserId;
+    if (!userId) {
+      return;
+    }
+    const policeNo = (this.data.editPoliceNo || "").trim();
+    const realName = (this.data.editRealName || "").trim();
+    const deptName = (this.data.editDeptName || "").trim();
+    const mobile = (this.data.editMobile || "").trim();
+
+    if (!realName) {
+      toast("姓名不能为空");
+      return;
+    }
+    if (!deptName) {
+      toast("部门不能为空");
+      return;
+    }
+    if (!policeNo && !mobile) {
+      toast("警号与手机号至少填写一个");
+      return;
+    }
+
+    this.setData({ saving: true });
+    try {
+      await api.updateAdminUser(userId, {
+        police_no: policeNo,
+        real_name: realName,
+        dept_name: deptName,
+        mobile: mobile
+      });
+      toast("已更新", "success");
+      this.cancelEditUser();
+      await this.loadUsers();
+    } catch (err) {
+      toast(err.message || "更新失败");
+    } finally {
+      this.setData({ saving: false });
     }
   },
 

@@ -82,31 +82,78 @@
 
     <block wx:for="{{users}}" wx:key="id" wx:for-item="user">
       <view class="card user-card">
-        <view class="space-between">
-          <view class="user-name">{{user.realName}}（{{user.policeNo}}）</view>
-          <text class="{{user.statusClass}}">{{user.statusLabel}}</text>
+        <view wx:if="{{editingUserId === user.id}}" class="edit-form">
+          <view class="section-title">编辑用户</view>
+          <input
+            class="input"
+            placeholder="警号"
+            value="{{editPoliceNo}}"
+            data-field="editPoliceNo"
+            bindinput="onEditInput"
+          />
+          <input
+            class="input"
+            placeholder="姓名"
+            value="{{editRealName}}"
+            data-field="editRealName"
+            bindinput="onEditInput"
+          />
+          <input
+            class="input"
+            placeholder="部门"
+            value="{{editDeptName}}"
+            data-field="editDeptName"
+            bindinput="onEditInput"
+          />
+          <input
+            class="input"
+            placeholder="手机号（11 位）"
+            value="{{editMobile}}"
+            data-field="editMobile"
+            bindinput="onEditInput"
+          />
+          <view class="muted hint-small">警号与手机号至少保留一个</view>
+          <view class="inline">
+            <button class="primary-btn half-btn" loading="{{saving}}" bindtap="submitEditUser">保存</button>
+            <button class="subtle-btn half-btn" bindtap="cancelEditUser">取消</button>
+          </view>
         </view>
-        <view class="muted">部门：{{user.deptName}}</view>
-        <view class="inline action-row">
-          <picker
-            mode="selector"
-            range="{{roleLabels}}"
-            value="{{user.roleIndex}}"
-            data-user-id="{{user.id}}"
-            bindchange="changeUserRole"
-          >
-            <view class="picker-role">{{user.roleLabel}}</view>
-          </picker>
-          <button
-            class="{{user.status === 'active' ? 'warn-btn' : 'primary-btn'}}"
-            size="mini"
-            data-user-id="{{user.id}}"
-            data-current-status="{{user.status}}"
-            bindtap="toggleUserStatus"
-          >
-            {{user.status === 'active' ? '禁用' : '启用'}}
-          </button>
-        </view>
+        <block wx:else>
+          <view class="space-between">
+            <view class="user-name">{{user.realName}}（{{user.policeNo || '无警号'}}）</view>
+            <text class="{{user.statusClass}}">{{user.statusLabel}}</text>
+          </view>
+          <view class="muted">部门：{{user.deptName}}</view>
+          <view wx:if="{{user.mobile}}" class="muted">手机：{{user.mobile}}</view>
+          <view class="inline action-row">
+            <picker
+              mode="selector"
+              range="{{roleLabels}}"
+              value="{{user.roleIndex}}"
+              data-user-id="{{user.id}}"
+              bindchange="changeUserRole"
+            >
+              <view class="picker-role">{{user.roleLabel}}</view>
+            </picker>
+            <button
+              class="subtle-btn"
+              size="mini"
+              data-user-id="{{user.id}}"
+              bindtap="startEditUser"
+            >
+              编辑
+            </button>
+            <button
+              class="{{user.status === 'active' ? 'warn-btn' : 'primary-btn'}}"
+              size="mini"
+              data-user-id="{{user.id}}"
+              data-current-status="{{user.status}}"
+              bindtap="toggleUserStatus"
+            >
+              {{user.status === 'active' ? '禁用' : '启用'}}
+            </button>
+          </view>
+        </block>
       </view>
     </block>
   </block>
