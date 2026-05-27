@@ -72,6 +72,7 @@ def list_slots(
                     meal_category=pkg.meal_category.value,
                     image_url=pkg.image_url or settings.default_meal_image_url,
                     price=float(pkg.price) if pkg.price is not None else None,
+                    unit=pkg.unit or "份",
                     calories=pkg.calories,
                     protein_g=float(pkg.protein_g) if pkg.protein_g is not None else None,
                     carbs_g=float(pkg.carbs_g) if pkg.carbs_g is not None else None,

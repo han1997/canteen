@@ -20,6 +20,7 @@ class AdminMealPackageOut(BaseModel):
     is_selectable: bool
     image_url: str
     price: float | None
+    unit: str
     calories: int | None
     protein_g: float | None
     carbs_g: float | None
@@ -54,6 +55,7 @@ class AdminMealPackageCreateRequest(BaseModel):
     meal_category: str = Field(default="normal", pattern="^(normal|fat_loss|self_pick)$")
     image_url: str | None = Field(default=None, max_length=255)
     price: float = Field(default=0, ge=0, le=9999)
+    unit: str = Field(default="份", min_length=1, max_length=16)
     calories: int | None = Field(default=None, ge=0)
     protein_g: float | None = Field(default=None, ge=0)
     carbs_g: float | None = Field(default=None, ge=0)
@@ -67,6 +69,7 @@ class AdminMealPackageUpdateRequest(BaseModel):
     meal_category: str | None = Field(default=None, pattern="^(normal|fat_loss|self_pick)$")
     image_url: str | None = Field(default=None, max_length=255)
     price: float | None = Field(default=None, ge=0, le=9999)
+    unit: str | None = Field(default=None, min_length=1, max_length=16)
     calories: int | None = Field(default=None, ge=0)
     protein_g: float | None = Field(default=None, ge=0)
     carbs_g: float | None = Field(default=None, ge=0)

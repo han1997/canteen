@@ -84,6 +84,14 @@
                     data-field="priceInput"
                     bindinput="onPackageInput"
                   />
+                  <input
+                    class="input compact-input unit-input"
+                    placeholder="单位"
+                    value="{{pkg.unitInput}}"
+                    data-pkg-index="{{pkgIndex}}"
+                    data-field="unitInput"
+                    bindinput="onPackageInput"
+                  />
                   <picker
                     wx:if="{{mealTypes[activeIndex].value !== 'breakfast'}}"
                     mode="selector"
@@ -167,6 +175,13 @@
                 type="digit"
                 value="{{drafts[mealTypes[activeIndex].value].priceInput}}"
                 data-field="priceInput"
+                bindinput="onDraftInput"
+              />
+              <input
+                class="input compact-input unit-input"
+                placeholder="单位"
+                value="{{drafts[mealTypes[activeIndex].value].unitInput}}"
+                data-field="unitInput"
                 bindinput="onDraftInput"
               />
               <picker

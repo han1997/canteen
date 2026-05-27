@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS meal_packages (
   is_deleted TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标记',
   image_url VARCHAR(255) NULL COMMENT '图片地址',
   price DECIMAL(10,2) NULL DEFAULT 0 COMMENT '单价',
+  unit VARCHAR(16) NOT NULL DEFAULT '份' COMMENT '单位（如：份/个/碗）',
   calories INT NULL COMMENT '热量(kcal)',
   protein_g DECIMAL(8,2) NULL COMMENT '蛋白质(g)',
   carbs_g DECIMAL(8,2) NULL COMMENT '碳水(g)',

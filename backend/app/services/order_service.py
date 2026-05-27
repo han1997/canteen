@@ -100,7 +100,7 @@ def create_or_replace_order(
                 item_name=pkg.package_name,
                 quantity=qty,
                 unit_price=float(pkg.price or 0),
-                unit="份",
+                unit=pkg.unit or "份",
             )
         )
 

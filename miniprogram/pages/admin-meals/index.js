@@ -108,6 +108,7 @@ function emptyDraft(defaultMealTypes) {
     imageUrl: DEFAULT_MEAL_IMAGE_URL,
     imagePreviewUrl: toPreviewImageUrl(DEFAULT_MEAL_IMAGE_URL),
     priceInput: "",
+    unitInput: "份",
     categoryIndex: 0,
     mealTypeCheckBreakfast: (defaultMealTypes || []).includes("breakfast"),
     mealTypeCheckLunch: (defaultMealTypes || []).includes("lunch"),
@@ -144,6 +145,7 @@ function formatPackage(pkg) {
     imageUrl: resolveImageUrl(pkg.image_url),
     imagePreviewUrl: toPreviewImageUrl(resolveImageUrl(pkg.image_url)),
     priceInput: String(pkg.price || 0),
+    unitInput: pkg.unit || "份",
     selectable: !!pkg.is_selectable,
     categoryIndex: categoryIndex(pkg.meal_category),
     // 餐别多选状态
@@ -420,6 +422,7 @@ Page({
     const mealType = this.activeMealType();
     const pkg = this.data.packagesByType[mealType][pkgIndex];
     const price = Number(pkg.priceInput || 0);
+    const unit = (pkg.unitInput || "").trim() || "份";
     if (!pkg.packageName.trim()) {
       toast("菜品名称不能为空");
       return;
@@ -441,6 +444,7 @@ Page({
       package_name: pkg.packageName.trim(),
       image_url: resolveImageUrl(pkg.imageUrl),
       price,
+      unit,
       is_selectable: pkg.selectable
     };
     // 早餐外的餐别才传 category
@@ -507,6 +511,7 @@ Page({
     const draft = this.data.drafts[mealType];
     const name = draft.packageName.trim();
     const price = Number(draft.priceInput || 0);
+    const unit = (draft.unitInput || "").trim() || "份";
     if (!name) {
       toast("请填写菜品名称");
       return;
@@ -527,7 +532,8 @@ Page({
       meal_types: mealTypes,
       package_name: name,
       image_url: resolveImageUrl(draft.imageUrl),
-      price
+      price,
+      unit
     };
     if (!(mealTypes.length === 1 && mealTypes[0] === "breakfast")) {
       payload.meal_category = CATEGORY_OPTIONS[draft.categoryIndex].value;

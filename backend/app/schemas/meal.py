@@ -18,6 +18,7 @@ class MealPackageOut(BaseModel):
     meal_category: str
     image_url: str
     price: float | None
+    unit: str
     calories: int | None
     protein_g: float | None
     carbs_g: float | None

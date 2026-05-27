@@ -4,6 +4,57 @@
 
 ## 2026-05-26
 
+### 新增：菜品支持自定义单位（默认"份"）
+
+**动机**：
+- 之前所有菜品订餐和导出都强制使用"份"作为单位，但实际业务中需要区分"份/个/碗/杯"等
+- 比如：包子按"个"卖、米饭按"碗"卖、豆浆按"杯"卖
+
+**变更**：
+
+1. **数据库**：
+   - `meal_packages` 新增 `unit VARCHAR(16) NOT NULL DEFAULT '份'` 列
+   - `backend/sql/schema.sql` 同步
+   - `backend/app/db/init_db.py` 增加 `_ensure_column("meal_packages", "unit", ...)` 迁移调用
+
+2. **后端 schemas**：
+   - `AdminMealPackageOut` / `AdminMealPackageCreateRequest` / `AdminMealPackageUpdateRequest`：新增 `unit` 字段
+   - `MealPackageOut`（用户端）：新增 `unit` 字段
+
+3. **后端 API**（`backend/app/api/v1/admin.py`）：
+   - 创建/更新菜品接受 `unit` 字段（默认"份"，最长 16 字符）
+   - 批量导入 Excel 的「单价」列支持两种格式：
+     - 纯数字：`5`、`5.5`（默认单位"份"）
+     - `金额/单位` 格式：`5/份`、`5/个`、`8.5/碗`
+   - 解析逻辑：若单价字符串包含 `/`，自动拆分为金额和单位
+
+4. **订餐**（`backend/app/services/order_service.py`）：
+   - 创建 `OrderItem` 时使用 `pkg.unit`，而非硬编码"份"
+   - 历史订单不受影响（OrderItem.unit 已存为快照）
+
+5. **小程序菜品管理**（`miniprogram/pages/admin-meals/`）：
+   - 「单价」输入框旁新增「单位」输入框（默认"份"）
+   - 编辑现有菜品和新增菜品的表单都包含单位字段
+   - 调整 `.price-input` 宽度（42% → 28%），新增 `.unit-input` 样式（22%）
+
+**Excel 导入格式示例**：
+
+| 餐别 | 菜品名称 | 分类 | 单价 |
+|------|---------|------|------|
+| 早餐 | 包子 | 普通套餐 | 1.5/个 |
+| 早餐 | 豆浆 | 普通套餐 | 2/杯 |
+| 中餐 | 牛肉饭 | 普通套餐 | 12 |
+| 午晚餐 | 米饭 | 普通套餐 | 2/碗 |
+
+**说明**：
+- 单位字段为字符串，无格式约束（仅长度限制）
+- 历史菜品的 unit 字段经迁移后默认为"份"
+- 导出的 Excel「订餐明细」/「菜品订购人」sheet 之前就读取 `OrderItem.unit`，现在会反映菜品真实单位
+
+---
+
+## 2026-05-26
+
 ### 新增：用户管理支持编辑基础信息
 
 **动机**：

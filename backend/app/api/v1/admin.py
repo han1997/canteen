@@ -95,6 +95,7 @@ def _build_meal_package_out(pkg: MealPackage) -> AdminMealPackageOut:
         is_selectable=pkg.is_selectable,
         image_url=pkg.image_url or "",
         price=float(pkg.price) if pkg.price is not None else None,
+        unit=pkg.unit or "份",
         calories=pkg.calories,
         protein_g=float(pkg.protein_g) if pkg.protein_g is not None else None,
         carbs_g=float(pkg.carbs_g) if pkg.carbs_g is not None else None,
@@ -649,6 +650,7 @@ def create_meal_package(
         is_selectable=payload.is_selectable,
         image_url=payload.image_url,
         price=payload.price,
+        unit=payload.unit,
         calories=payload.calories,
         protein_g=payload.protein_g,
         carbs_g=payload.carbs_g,
@@ -687,7 +689,8 @@ async def bulk_import_meal_packages(
     db: Session = Depends(get_db),
 ):
     """批量导入菜品。Excel 表头：餐别 / 菜品名称 / 分类 / 单价。
-    餐别：早餐/中餐/晚餐；分类：普通套餐/减脂套餐/自选菜；单价为数字。
+    餐别：早餐/中餐/晚餐/午晚餐；分类：普通套餐/减脂套餐/自选菜；
+    单价格式：纯数字（默认单位"份"）或"金额/单位"格式（如 "5/份"、"5/个"）。
     限制：文件最大 10MB，最多 1000 行数据。"""
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
@@ -763,13 +766,26 @@ async def bulk_import_meal_packages(
 
             meal_types = meal_type_map.get(meal_type_raw)
             if not meal_types:
-                errors.append(f"第 {idx} 行：餐别「{meal_type_raw}」无效（支持：早餐/中餐/晚餐/午晚餐）")
+                errors.append(f"第 {idx} 行：餐别「{meal_type_raw}」无效（支持：早餐/中餐/晚餐/午晚餐)")
                 continue
 
             category = category_map.get(category_raw, "normal")
 
+            # 解析单价：支持 "5"、"5.5"、"5/份"、"5/个" 等格式
+            unit = "份"
+            price_str = str(price_raw).strip() if price_raw is not None else "0"
+            if "/" in price_str:
+                parts = price_str.split("/", 1)
+                price_str = parts[0].strip()
+                parsed_unit = parts[1].strip()
+                if parsed_unit:
+                    if len(parsed_unit) > 16:
+                        errors.append(f"第 {idx} 行：单位「{parsed_unit}」过长（最多 16 个字符）")
+                        continue
+                    unit = parsed_unit
+
             try:
-                price = float(price_raw)
+                price = float(price_str)
                 if price < 0:
                     errors.append(f"第 {idx} 行：单价不能为负数")
                     continue
@@ -795,6 +811,7 @@ async def bulk_import_meal_packages(
                 meal_category=MealCategoryEnum(category),
                 is_selectable=True,
                 price=price,
+                unit=unit,
                 sort_order=sort_order,
             )
             db.add(pkg)
@@ -882,6 +899,8 @@ def update_meal_package(
         pkg.image_url = payload.image_url
     if payload.price is not None:
         pkg.price = payload.price
+    if payload.unit is not None:
+        pkg.unit = payload.unit
     if payload.calories is not None:
         pkg.calories = payload.calories
     if payload.protein_g is not None:

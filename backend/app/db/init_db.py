@@ -117,6 +117,11 @@ def _ensure_legacy_columns() -> None:
         "is_deleted",
         "ALTER TABLE meal_packages ADD COLUMN is_deleted TINYINT(1) NOT NULL DEFAULT 0",
     )
+    _ensure_column(
+        "meal_packages",
+        "unit",
+        "ALTER TABLE meal_packages ADD COLUMN unit VARCHAR(16) NOT NULL DEFAULT '份'",
+    )
     _migrate_meal_packages_to_template()
     _ensure_enum_value(
         "meal_packages",
