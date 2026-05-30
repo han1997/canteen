@@ -2,6 +2,80 @@
 
 本仓库的变更日志，每次代码修改后追加。日期为本地时区（Asia/Shanghai）。
 
+## 2026-05-30
+
+### 新增：登录页"记住账号"功能
+
+**动机**：
+- 用户每次打开小程序都需要重新输入账号密码
+- 虽然 token 会持久化，但 token 过期后仍需手动输入
+- 缺少便捷的自动填充机制
+
+**变更**：
+
+1. **`miniprogram/pages/login/index.wxml`**：
+   - 在密码输入框下方新增"记住账号"复选框
+   - 使用 `<label>` + `<checkbox>` 组件实现
+
+2. **`miniprogram/pages/login/index.js`**：
+   - 新增 `rememberPassword` 数据字段（默认 `false`）
+   - 新增 `onLoad` 生命周期：页面加载时从本地存储读取 `savedAccount`、`rememberPassword`，若存在则自动填充账号
+   - 新增 `onRememberChange` 方法：处理复选框变化
+   - 修改 `submitLogin` 方法：登录成功后，根据 `rememberPassword` 状态保存或清除账号到本地存储（**仅保存账号，不保存密码**）
+
+3. **`miniprogram/pages/login/index.wxss`**：
+   - 新增 `.remember-row` 样式：复选框行容器
+   - 新增 `.remember-label` 样式：flex 布局，复选框与文字对齐
+   - 复选框缩放至 0.85 以匹配设计
+
+**效果**：
+- 用户勾选"记住账号"后，下次打开小程序会自动填充账号（密码需手动输入）
+- 取消勾选后会清除已保存的账号
+- 配合已有的 token 持久化机制，提供更流畅的登录体验
+- **安全性**：仅保存账号，不保存密码，避免明文密码存储风险
+
+### 修复：菜品管理页按钮文字在真机上被截断
+
+**问题**：
+- 真机上按钮文字显示不全，出现"返回..."、"用户..."等省略号
+- 原因是 grid 布局中 `min-width: 0` 导致按钮被过度压缩
+
+**修复**：
+- 移除 `.action-btn` 的 `min-width: 0` 属性
+- 添加 `overflow: hidden` 和 `text-overflow: ellipsis` 作为兜底
+- 减小左右内边距从 `12rpx` 到 `8rpx` 以留出更多空间给文字
+- 保持 `white-space: nowrap` 确保文字不换行
+
+### 订餐开关支持自选日期
+
+**动机**：
+- 原有订餐开关仅支持"今天"和"明天"两个固定日期
+- 管理员需要提前设置更远日期的订餐开关时需要等到当天
+- 缺少灵活性，无法应对节假日或特殊情况的提前配置
+
+**变更**：
+
+1. **`miniprogram/pages/admin-meals/index.wxml`**：
+   - 订餐开关日期 tab 从 2 列扩展为 3 列
+   - 新增"自选日期" tab，内嵌 `<picker mode="date">` 组件
+   - 使用 `catchtap="stopPropagation"` 防止点击 picker 时触发 tab 切换
+
+2. **`miniprogram/pages/admin-meals/index.js`**：
+   - `slotDayTabs` 新增第三项：`{ label: "自选日期", date: addDays(todayString(), 2), isCustom: true }`
+   - 新增 `customDatePickerValue` 数据字段，默认为后天日期
+   - 新增 `onCustomDateChange` 方法：选择日期后验证（不能选择过去日期，最多提前30天），更新 tab 数据、切换到该 tab、重新加载开关状态
+   - 新增 `stopPropagation` 空方法用于阻止事件冒泡
+   - 修复潜在竞态条件：移除 `setData` 中的 `slotChips` 设置，统一由 `loadSlotChips()` 处理
+
+3. **`miniprogram/pages/admin-meals/index.wxss`**：
+   - `.slot-day-tabs` 改为 3 列布局（`grid-template-columns: repeat(3, 1fr)`）
+
+**效果**：
+- 管理员可点击"自选日期" tab 打开日期选择器
+- 选择日期后自动切换到该日期并加载对应的订餐开关状态
+- 支持查看和设置任意未来日期的早/中/晚餐订餐开关
+- 所有 tab 样式统一，选中的日期始终显示在标题栏右侧
+
 ## 2026-05-26
 
 ### 重设计：建立统一设计系统，全站视觉风格升级

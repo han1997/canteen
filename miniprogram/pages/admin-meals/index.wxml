@@ -27,7 +27,10 @@
             data-index="{{dayIdx}}"
             bindtap="onSlotDayTabChange"
           >
-            {{item.label}}
+            <text wx:if="{{!item.isCustom}}">{{item.label}}</text>
+            <picker wx:else mode="date" value="{{customDatePickerValue}}" bindchange="onCustomDateChange" catchtap="stopPropagation">
+              <text>{{item.label}}</text>
+            </picker>
           </view>
         </view>
         <view class="today-slots-grid">

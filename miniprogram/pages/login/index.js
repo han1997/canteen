@@ -13,9 +13,23 @@ Page({
     loading: false,
     loginAccount: "",
     loginPassword: "",
+    rememberPassword: false,
     bindPoliceNo: "",
     bindMobile: "",
     bindRealName: ""
+  },
+
+  onLoad() {
+    // 读取记住的账号（不保存密码，仅自动填充账号）
+    const savedAccount = wx.getStorageSync("savedAccount") || "";
+    const rememberPassword = wx.getStorageSync("rememberPassword") || false;
+
+    if (rememberPassword && savedAccount) {
+      this.setData({
+        loginAccount: savedAccount,
+        rememberPassword: true
+      });
+    }
   },
 
   async onShow() {
@@ -52,6 +66,12 @@ Page({
     });
   },
 
+  onRememberChange(e) {
+    this.setData({
+      rememberPassword: !!e.detail.value
+    });
+  },
+
   async loginAndEnter(accessToken) {
     const app = getApp();
     app.setAuth(accessToken, null);
@@ -74,6 +94,16 @@ Page({
         account,
         password
       });
+
+      // 保存或清除记住的账号（仅保存账号，不保存密码）
+      if (this.data.rememberPassword) {
+        wx.setStorageSync("savedAccount", account);
+        wx.setStorageSync("rememberPassword", true);
+      } else {
+        wx.removeStorageSync("savedAccount");
+        wx.removeStorageSync("rememberPassword");
+      }
+
       await this.loginAndEnter(result.access_token);
       toast("登录成功", "success");
     } catch (err) {

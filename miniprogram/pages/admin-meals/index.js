@@ -170,8 +170,10 @@ Page({
     slotDayIndex: 0,
     slotDayTabs: [
       { label: "今天", date: todayString() },
-      { label: "明天", date: addDays(todayString(), 1) }
+      { label: "明天", date: addDays(todayString(), 1) },
+      { label: "自选日期", date: addDays(todayString(), 2), isCustom: true }
     ],
+    customDatePickerValue: addDays(todayString(), 2),
     slotChips: [
       { mealType: "breakfast", label: "早餐", isOpen: false, slotId: null },
       { mealType: "lunch", label: "中餐", isOpen: false, slotId: null },
@@ -313,6 +315,48 @@ Page({
       slotDayIndex: idx,
       slotChips: this.data.slotChipsByDate[tab.date] || this.buildChipsForDate(tab.date)
     });
+  },
+
+  onCustomDateChange(e) {
+    const selectedDate = e.detail.value;
+    if (!selectedDate) {
+      return;
+    }
+
+    // 验证日期不能是过去
+    const today = todayString();
+    if (selectedDate < today) {
+      toast("不能选择过去的日期");
+      return;
+    }
+
+    // 限制最多提前30天设置
+    const maxDate = addDays(today, 30);
+    if (selectedDate > maxDate) {
+      toast("最多只能提前30天设置");
+      return;
+    }
+
+    const customTabIndex = this.data.slotDayTabs.findIndex((t) => t.isCustom);
+    if (customTabIndex < 0) {
+      return;
+    }
+    const updatedTabs = [...this.data.slotDayTabs];
+    updatedTabs[customTabIndex] = {
+      ...updatedTabs[customTabIndex],
+      date: selectedDate
+    };
+    this.setData({
+      slotDayTabs: updatedTabs,
+      customDatePickerValue: selectedDate,
+      slotDayIndex: customTabIndex
+    });
+    // 重新加载该日期的开关状态
+    this.loadSlotChips();
+  },
+
+  stopPropagation() {
+    // 阻止事件冒泡，防止点击 picker 时触发 tab 切换
   },
 
   async onToggleSlot(e) {

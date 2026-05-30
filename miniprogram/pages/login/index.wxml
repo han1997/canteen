@@ -39,6 +39,12 @@
         data-field="loginPassword"
         bindinput="onInput"
       />
+      <view class="remember-row">
+        <label class="remember-label">
+          <checkbox checked="{{rememberPassword}}" bindchange="onRememberChange" />
+          <text>记住账号</text>
+        </label>
+      </view>
       <button class="primary-btn" loading="{{loading}}" bindtap="submitLogin">登录</button>
     </block>
 

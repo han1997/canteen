@@ -73,6 +73,22 @@
   border-radius: var(--radius-md);
 }
 
+.remember-row {
+  margin: 12rpx 0 8rpx;
+}
+
+.remember-label {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+}
+
+.remember-label checkbox {
+  transform: scale(0.85);
+}
+
 .brand-card + .card {
   padding: 36rpx 28rpx;
 }

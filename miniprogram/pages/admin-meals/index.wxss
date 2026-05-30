@@ -78,7 +78,7 @@
 
 .slot-day-tabs {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8rpx;
   padding: 6rpx;
   background: rgba(255, 255, 255, 0.12);
@@ -309,12 +309,13 @@
   margin: 0;
   height: 64rpx;
   line-height: 64rpx;
-  padding: 0 12rpx;
+  padding: 0 8rpx;
   border-radius: var(--radius-md);
   font-size: 24rpx;
   font-weight: 600;
   white-space: nowrap;
-  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .action-btn.full-btn {
